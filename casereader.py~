@@ -1,0 +1,11 @@
+#! /usr/bin/python
+
+import dose_to_points_data_pb2
+import sys
+
+dpdata = dose_to_points_data_pb2.DoseToPointsData()
+
+f = open('spine/spinetestproto', "rb")
+dpdata.ParseFromString(f.read())
+f.close()
+print(len(dpdata.PointDoses))

@@ -1,0 +1,55 @@
+syntax = "proto3";
+package ProtoFileGenerator;
+
+message Beam {
+   string Id = 1;
+   double JawX1 = 2;
+   double JawX2 = 3;
+   double JawY1 = 4;
+   double JawY2 = 5;
+   int32 StartBeamletIndex = 6;
+   int32 EndBeamletIndex = 7;
+}
+
+message Beamlet {
+   int32 Index = 1;
+   string BeamId = 2;
+   double XSize = 3;
+   double YSize = 4;
+   double XStart = 5;
+   double YStart = 6;
+}
+
+message BeamletDose {
+   int32 Index = 1;
+   double Dose = 2;
+}
+
+message DoseToPointsData {
+   string FileGUID = 1;
+   repeated Structure Structures = 2;
+   repeated Beam Beams = 3;
+   repeated Point Points = 4;
+   repeated Beamlet Beamlets = 5;
+   repeated PointDose PointDoses = 6;
+}
+
+message Point {
+   int32 Index = 1;
+   string StructureId = 2;
+   double X = 3;
+   double Y = 4;
+   double Z = 5;
+}
+
+message PointDose {
+   int32 Index = 1;
+   repeated BeamletDose BeamletDoses = 2;
+}
+
+message Structure {
+   string Id = 1;
+   double pointsDistanceCM = 2;
+   int32 StartPointIndex = 3;
+   int32 EndPointIndex = 4;
+}
