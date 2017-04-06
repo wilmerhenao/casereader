@@ -342,7 +342,7 @@ class problemData():
 # Output:   validbeamlets ONLY contains those beamlet INDICES for which we have available data in this beam angle
 #           validbeamletspecialrange is the same as validbeamlets but appending the endpoints
 def fvalidbeamlets(index):
-    validbeamlets = np.array(range(beamList[index].leftEdge + 1, beamList[index].rightEdge - 1))[validbeamletlogic]
+    validbeamlets = np.array(range(beamList[index].leftEdge + 1, beamList[index].rightEdge - 1))
     validbeamletspecialrange = np.append(np.append(min(validbeamlets) - 1, validbeamlets), max(validbeamlets) + 1)
     # That last line appends the endpoints.
     return (validbeamlets, validbeamletspecialrange)
