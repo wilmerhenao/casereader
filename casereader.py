@@ -15,8 +15,12 @@ import pickle
 numcores = 6
 
 gc.enable()
-datalocation = "/mnt/fastdata/Data/spine"
-datalocation = "/home/wilmer/Dropbox/Data/spine/"
+thismachine = socket.gethostname()
+datalocation = '~'
+if 'radiation-math' == socket.gethostname():
+    datalocation = "/mnt/fastdata/Data/spine"
+if 'sharkpool' == socket.gethostname():
+    datalocation = "/home/wilmer/Dropbox/Data/spine/"
 
 ## This class contains a structure (region)
 class structure(object):
