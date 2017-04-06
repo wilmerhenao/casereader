@@ -11,6 +11,7 @@ from scipy.optimize import minimize
 from multiprocessing import Pool
 from functools import partial
 import socket
+import math
 
 numcores = 6
 
