@@ -10,7 +10,7 @@ from scipy import sparse
 from scipy.optimize import minimize
 from multiprocessing import Pool
 from functools import partial
-import pickle
+import socket
 
 numcores = 6
 
