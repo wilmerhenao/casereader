@@ -10,6 +10,7 @@ from scipy import sparse
 from scipy.optimize import minimize
 from multiprocessing import Pool
 from functools import partial
+import pickle
 
 numcores = 6
 
@@ -30,6 +31,7 @@ class structure(object):
         self.EndPointIndex = sthing.EndPointIndex
         self.Size = self.EndPointIndex - self.StartPointIndex
         self.isTarget = False
+        self.isKilled = False
         # Identify targets
         alb = "PTV" in self.Id;
         ala = "GTV" in self.Id;
@@ -226,15 +228,15 @@ gc.collect()
 ## Get the point to dose data in a sparse matrix
 start = time.time()
 
-def get_raw_Protobuf(pointa, pointb):
+def getDmatrixPieces():
     ## Initialize vectors for voxel component, beamlet component and dose
-    ## Read the beams now.
     vcps = []
     bcps = []
-    dcps1 = np.array([1.0])
     dcps = []
+
+    ## Read the beams now.
     counter = 0
-    for fl in datafiles[pointa:pointb]:
+    for fl in datafiles[0:1]:
         counter+=1
         print('reading datafile:', counter,fl)
         dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -242,112 +244,51 @@ def get_raw_Protobuf(pointa, pointb):
         f = open(fl, "rb")
         dpdata.ParseFromString(f.read())
         f.close()
+
         for dp in dpdata.PointDoses:
             numbeamletDoses = len(dp.BeamletDoses)
             vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
             bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
             dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
         gc.collect()
-        print(sys.getsizeof(dcps), sys.getsizeof(bcps))
-    return(bcps, vcps, dcps)
+    return(vcps, bcps, dcps)
 
-def getDatafromProtobuf():
-    bcps1, vcps1, dcps1 = get_raw_Protobuf(0,10)
-    ## Save to a pickle file and later plotting
-    datasave = [bcps1, vcps1, dcps1]
-    PIK = "dtp1.dat"
-    with open(PIK, "wb") as f:
-        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
-    del bcps1
-    del vcps1
-    del dcps1
-    bcps2, vcps2, dcps2 = get_raw_Protobuf(10,20)
-    ## Save to a pickle file and later plotting
-    datasave = [bcps2, vcps2, dcps2]
-    PIK = "dtp2.dat"
-    with open(PIK, "wb") as f:
-        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
-    del bcps2
-    del vcps2
-    del dcps2
-    bcps3, vcps3, dcps3 = get_raw_Protobuf(20,30)
-    ## Save to a pickle file and later plotting
-    datasave = [bcps3, vcps3, dcps3]
-    PIK = "dtp3.dat"
-    with open(PIK, "wb") as f:
-        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
-    del bcps3
-    del vcps3
-    del dcps3
-    bcps4, vcps4, dcps4 = get_raw_Protobuf(30,37)
-    ## Save to a pickle file and later plotting
-    datasave = [bcps4, vcps4, dcps4]
-    PIK = "dtp4.dat"
-    with open(PIK, "wb") as f:
-        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
-    del bcps4
-    del vcps4
-    del dcps4
+vlist, blist, dlist = getDmatrixPieces()
 
-#getDatafromProtobuf()
-c1 = pickle.load( open( "dtp1.dat", "rb" ) )
-bcps = c1[0]
-vcps = c1[1]
-dcps = c1[2]
-del c1
-c2 = pickle.load( open( "dtp2.dat", "rb" ) )
-bcps += c2[0]
-vcps += c2[1]
-dcps += c2[2]
-del c2
-c3 = pickle.load( open( "dtp3.dat", "rb" ) )
-bcps += c3[0]
-vcps += c3[1]
-dcps += c3[2]
-del c3
-c4 = pickle.load( open( "dtp4.dat", "rb" ) )
-bcps += c4[0]
-vcps += c4[1]
-dcps += c4[2]
-del c4
+killlist = range(17,23)
 
-killlist = range(17:23)
-
-def eliminateListofStructures(killlist):
+def eliminateListofStructures(killlist, vlist, blist, dlist):
     vkills = []
     for i in killlist:
         vkills += list(range(structureList[i].StartPointIndex, (structureList[i].EndPointIndex+1)))
-    vcps = [vcps[ind] for ind, x in enumerate(bcps) if x not in vkills]
-    dcps = [dcps[ind] for ind, x in enumerate(bcps) if x not in vkills]
-    bcps = [x for ind, x in enumerate(bcps) if x not in vkills]
+        structureList[i].isKilled = True
+    vlist = [vlist[ind] for ind, x in enumerate(blist) if x not in vkills]
+    dlist = [dlist[ind] for ind, x in enumerate(blist) if x not in vkills]
+    blist = [x for ind, x in enumerate(blist) if x not in vkills]
+    return(vlist, blist, dlist)
 
-
-def createDmatrix():
-    DmatBig = sparse.csr_matrix((dcps, (bcps, vcps)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
-    del vcps
-    del bcps
-    del dcps
-    return(DmatBig)
-
-DmatBig = createDmatrix()
+#print(len(vlist), len(blist), len(dlist))
+#vlist, blist, dlist = eliminateListofStructures(killlist, vlist, blist, dlist)
+#print('after')
+#print(len(vlist), len(blist), len(dlist))
+DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
+del vlist
+del blist
+del dlist
 
 print('total time reading dose to points:', time.time() - start)
 #------------------------------------------------------------------------------------------------------------------
 
-class problemData(sList, vList):
+class problemData():
     def __init__(self):
         self.kappa = []
         self.notinC = apertureList()
         self.caligraphicC = apertureList()
         self.currentDose = np.zeros(voxel.numVoxels, dtype = float)
-        self.self.quadHelperThresh = np.empty(voxel.numVoxels, dtype = float)
+        self.quadHelperThresh = np.empty(voxel.numVoxels, dtype = float)
         self.quadHelperOver = np.empty(voxel.numVoxels, dtype = float)
         self.quadHelperUnder = np.empty(voxel.numVoxels, dtype = float)
-        self.setQuadHelpers(sList, vList)
+        self.setQuadHelpers(structureList, voxelList)
         self.openApertureMaps = [[] for i in range(beam.numBeams)]
         self.diagmakers = [[] for i in range(beam.numBeams)]
         self.strengths = [[] for i in range(beam.numBeams)]
@@ -356,7 +297,7 @@ class problemData(sList, vList):
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
             sid = vList[i].StructureId # Find structure of this particular voxel
-            self.self.quadHelperThresh[i] = sList[sid].threshold
+            self.quadHelperThresh[i] = sList[sid].threshold
             self.quadHelperOver[i] = sList[sid].overdoseCoeff
             self.quadHelperUnder[i] = sList[sid].underdoseCoeff
 
@@ -884,7 +825,7 @@ def plotApertures(C):
         plt.axis('off')
     fig.savefig('/home/wilmer/Dropbox/Research/VMAT/VMATwPenCode/outputGraphics/plotofapertures'+ str(C) + '.png')
 
-data = problemData(structureList, voxelList)
+data = problemData()
 CValue = 1.0
 column_generation(CValue)
 
