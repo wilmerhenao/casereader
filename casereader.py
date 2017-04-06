@@ -225,15 +225,16 @@ gc.collect()
 #----------------------------------------------------------------------------------------
 ## Get the point to dose data in a sparse matrix
 start = time.time()
-def createDmatrix():
+
+def get_raw_Protobuf(pointa, pointb):
     ## Initialize vectors for voxel component, beamlet component and dose
+    ## Read the beams now.
     vcps = []
     bcps = []
+    dcps1 = np.array([1.0])
     dcps = []
-
-    ## Read the beams now.
     counter = 0
-    for fl in datafiles[0:3]:
+    for fl in datafiles[pointa:pointb]:
         counter+=1
         print('reading datafile:', counter,fl)
         dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -241,13 +242,91 @@ def createDmatrix():
         f = open(fl, "rb")
         dpdata.ParseFromString(f.read())
         f.close()
-
         for dp in dpdata.PointDoses:
             numbeamletDoses = len(dp.BeamletDoses)
             vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
             bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
             dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
         gc.collect()
+        print(sys.getsizeof(dcps), sys.getsizeof(bcps))
+    return(bcps, vcps, dcps)
+
+def getDatafromProtobuf():
+    bcps1, vcps1, dcps1 = get_raw_Protobuf(0,10)
+    ## Save to a pickle file and later plotting
+    datasave = [bcps1, vcps1, dcps1]
+    PIK = "dtp1.dat"
+    with open(PIK, "wb") as f:
+        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
+    del bcps1
+    del vcps1
+    del dcps1
+    bcps2, vcps2, dcps2 = get_raw_Protobuf(10,20)
+    ## Save to a pickle file and later plotting
+    datasave = [bcps2, vcps2, dcps2]
+    PIK = "dtp2.dat"
+    with open(PIK, "wb") as f:
+        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
+    del bcps2
+    del vcps2
+    del dcps2
+    bcps3, vcps3, dcps3 = get_raw_Protobuf(20,30)
+    ## Save to a pickle file and later plotting
+    datasave = [bcps3, vcps3, dcps3]
+    PIK = "dtp3.dat"
+    with open(PIK, "wb") as f:
+        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
+    del bcps3
+    del vcps3
+    del dcps3
+    bcps4, vcps4, dcps4 = get_raw_Protobuf(30,37)
+    ## Save to a pickle file and later plotting
+    datasave = [bcps4, vcps4, dcps4]
+    PIK = "dtp4.dat"
+    with open(PIK, "wb") as f:
+        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
+    del bcps4
+    del vcps4
+    del dcps4
+
+#getDatafromProtobuf()
+c1 = pickle.load( open( "dtp1.dat", "rb" ) )
+bcps = c1[0]
+vcps = c1[1]
+dcps = c1[2]
+del c1
+c2 = pickle.load( open( "dtp2.dat", "rb" ) )
+bcps += c2[0]
+vcps += c2[1]
+dcps += c2[2]
+del c2
+c3 = pickle.load( open( "dtp3.dat", "rb" ) )
+bcps += c3[0]
+vcps += c3[1]
+dcps += c3[2]
+del c3
+c4 = pickle.load( open( "dtp4.dat", "rb" ) )
+bcps += c4[0]
+vcps += c4[1]
+dcps += c4[2]
+del c4
+
+killlist = range(17:23)
+
+def eliminateListofStructures(killlist):
+    vkills = []
+    for i in killlist:
+        vkills += list(range(structureList[i].StartPointIndex, (structureList[i].EndPointIndex+1)))
+    vcps = [vcps[ind] for ind, x in enumerate(bcps) if x not in vkills]
+    dcps = [dcps[ind] for ind, x in enumerate(bcps) if x not in vkills]
+    bcps = [x for ind, x in enumerate(bcps) if x not in vkills]
+
+
+def createDmatrix():
     DmatBig = sparse.csr_matrix((dcps, (bcps, vcps)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
     del vcps
     del bcps
