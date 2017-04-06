@@ -188,10 +188,12 @@ f.close()
 # Get the data about the structures
 numstructs = len(dpdata.Structures)
 structureList = []
+structureDict = {}
 print("Reading in structures")
 for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
     structureList.append(structure(dpdata.Structures[s]))
+    structureDict[structureList[s].Id] = s
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 #----------------------------------------------------------------------------------------
@@ -300,7 +302,7 @@ class problemData():
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
-            sid = vList[i].StructureId # Find structure of this particular voxel
+            sid = structureDict[vList[i].StructureId] # Find structure of this particular voxel
             self.quadHelperThresh[i] = sList[sid].threshold
             self.quadHelperOver[i] = sList[sid].overdoseCoeff
             self.quadHelperUnder[i] = sList[sid].underdoseCoeff
