@@ -298,7 +298,7 @@ class problemData():
         self.openApertureMaps = [[] for i in range(beam.numBeams)]
         self.diagmakers = [[] for i in range(beam.numBeams)]
         self.strengths = [[] for i in range(beam.numBeams)]
-        self.DlistT = [DmatBig[BeamList[i].StartBeamletIndex:BeamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+        self.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
