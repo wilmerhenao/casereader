@@ -477,10 +477,12 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
-            print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
-            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw , rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
+            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
+            print('what happened before:', math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )),
+                  math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem / speedlim) / bw,
+                                rcp[m] - vmaxp * (angdistancep / speedlim) / bw)))
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
                 print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
