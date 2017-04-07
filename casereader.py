@@ -255,7 +255,7 @@ def getDmatrixPieces():
 
     ## Read the beams now.
     counter = 0
-    for fl in datafiles[2:3]:
+    for fl in datafiles[0:10]:
         counter+=1
         print('reading datafile:', counter,fl)
         dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -315,6 +315,7 @@ class problemData():
         self.YU = None
         self.RU = None
         self.speedlim = None
+        self.rmpres = None
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -742,7 +743,7 @@ def column_generation(C):
             structureList[bestApertureIndex].rlist = rm
             # Precalculate the aperture map to save times.
             data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-            rmpres = solveRMC(data.YU)
+            data.rmpres = solveRMC(data.YU)
             print('I returned')
             ## List of apertures that was removed in this iteration
             #IndApRemovedThisStep = []
@@ -759,7 +760,7 @@ def column_generation(C):
             #print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
             #data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
-            optimalvalues.append(rmpres.fun)
+            optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
             printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             #Step 5 on Fei's paper. If necessary complete the treatment plan by identifying feasible apertures at control points c
@@ -821,9 +822,9 @@ def plotApertures(C):
     ycoor = math.ceil(math.sqrt(beam.numBeams))
     nrows, ncols = beam.M, beam.N
     print('numbeams', beam.numBeams)
-    for mynumbeam in range(0, data.numbeams):
-        lmag = data.llist[mynumbeam]
-        rmag = data.rlist[mynumbeam]
+    for mynumbeam in range(0, beam.numBeams):
+        lmag = beamList[mynumbeam].llist
+        rmag = beamList[mynumbeam].rlist
         ## Convert the limits to hundreds.
         for posn in range(0, len(lmag)):
             lmag[posn] = int(magnifier * lmag[posn])
@@ -831,7 +832,7 @@ def plotApertures(C):
         image = -1 * np.ones(magnifier * nrows * ncols)
             # Reshape things into a 9x9 grid
         image = image.reshape((nrows, magnifier * ncols))
-        for i in range(0, M):
+        for i in range(0, beam.M):
             image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam]
         image = np.repeat(image, magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
         image[0,0] = data.YU # In order to get the right list of colors
@@ -842,7 +843,7 @@ def plotApertures(C):
         cmapper.set_under('black', 1.0)
         plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
         plt.axis('off')
-    fig.savefig('/home/wilmer/Dropbox/Research/VMAT/VMATwPenCode/outputGraphics/plotofapertures'+ str(C) + '.png')
+    fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
 
 data = problemData()
 data.voxelsUsed = np.unique(vlist)
