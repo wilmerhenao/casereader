@@ -100,8 +100,8 @@ class beamlet(object):
     def __init__(self, sthing):
         beamlet.numBeamlets += 1
         self.Index = sthing.Index
-        self.XStart = sthing.XStart
-        self.YStart = sthing.YStart
+        self.XStart = sthing.XStart + 35 # Make everything start at zero
+        self.YStart = sthing.YStart + 35
         beamlet.XSize = sthing.XSize
         beamlet.YSize = sthing.YSize
         self.belongsToBeam = None
@@ -195,6 +195,7 @@ for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
     structureList.append(structure(dpdata.Structures[s]))
     structureDict[structureList[s].Id] = s
+    print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].StartPointIndex)
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 #----------------------------------------------------------------------------------------
@@ -259,7 +260,6 @@ def getDmatrixPieces():
             dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
         gc.collect()
     return(vcps, bcps, dcps)
-
 vlist, blist, dlist = getDmatrixPieces()
 
 killlist = range(17,23)
@@ -278,6 +278,7 @@ def eliminateListofStructures(killlist, vlist, blist, dlist):
 #vlist, blist, dlist = eliminateListofStructures(killlist, vlist, blist, dlist)
 #print('after')
 #print(len(vlist), len(blist), len(dlist))
+print('voxels used:', np.unique(vlist))
 DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
 del vlist
 del blist
@@ -420,7 +421,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         leftrange = np.arange(midpoint, midpoint + 1)
         ##print('constraint leftrange at level ' + str(0) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[0], angdistancem, lcp[0], angdistancep', lcm[0], angdistancem, lcp[0], angdistancep, '\nFull left limits, lcp, lcm:', lcp, lcm, 'm: ', 0, 'predecesor: ', predec, 'succesor: ', succ)
     for l in leftrange:
-        rightrange = range(math.ceil(max(l + 1, rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(N, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
+        rightrange = range(math.ceil(max(l + 1, rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
         if (0 == len(rightrange)):
             midpoint = (angdistancep * rcm[0] + angdistancem * rcp[0])/(angdistancep + angdistancem)
             rightrange = np.arange(midpoint, midpoint + 1)
@@ -462,7 +463,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
-            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw , rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(N, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
+            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw , rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
                 rightrange = np.arange(midpoint, midpoint + 1)
@@ -554,8 +555,6 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
     return(p,l,r,thisApertureIndex)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw):
-    pstar = np.inf
-    bestAperture = None
     print("Choosing one aperture amongst the ones that are available")
     # Allocate empty list with enough size for all l, r combinations
     global structureList
@@ -589,6 +588,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
         Perimeter += np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1])
     Perimeter += r[len(r)-1] - l[len(l)-1] + np.sign(r[len(r)-1] - l[len(l)-1])
     Kellymeasure = Perimeter / Area
+    print('the pstar to be sent:', pstar)
     return(pstar, l, r, bestApertureIndex)
 
 ## This function returns the set of available AND open beamlets for the selected aperture (i).
@@ -834,7 +834,7 @@ def plotApertures(C):
 
 data = problemData()
 CValue = 1.0
-column_generation(CValue)
+column_generation(0)
 
 
 
