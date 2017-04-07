@@ -67,6 +67,8 @@ class structure(object):
 
 class beam(object):
     numBeams = 0
+    M = 8
+    N = 70
     JawX1 = None
     JawX2 = None
     JawY1 = None
@@ -86,9 +88,8 @@ class beam(object):
         self.beamletsPerBeam = self.EndBeamletIndex - self.StartBeamletIndex
         self.beamletsInBeam = self.beamletsPerBeam
         # Initialize left and right leaf limits for all
-        self.M = 8
-        self.leftEdge = -36
-        self.rightEdge = 35
+        self.leftEdge = -1
+        self.rightEdge = 70
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
 
@@ -311,6 +312,9 @@ class problemData():
         self.voxelsUsed = None
         self.structuresUsed = None
         self.structureIndexUsed = None
+        self.YU = None
+        self.RU = None
+        self.speedlim = None
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -702,11 +706,11 @@ def column_generation(C):
     eliminationThreshold = 10E-3
     ## Maximum leaf speed
     vmax = 5 * 2.25 # 2.25 cms per second
-    speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
+    data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
-    RU = 10.0
+    data.RU = 10.0
     ## Maximum intensity
-    YU = RU / speedlim
+    data.YU = data.RU / data.speedlim
     beamletwidth = 0.2
 
     #Step 0 on Fei's paper. Set C = empty and zbar = 0. The gradient of numbeams dimensions generated here will not
@@ -722,7 +726,7 @@ def column_generation(C):
         # Step 1 on Fei's paper. Use the information on the current treatment plan to formulate and solve an instance of the PP
         data.calcDose()
         data.calcGradientandObjValue()
-        pstar, lm, rm, bestApertureIndex = PricingProblem(C, C2, C3, vmax, speedlim, beamletwidth)
+        pstar, lm, rm, bestApertureIndex = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
         if pstar >= 0:
@@ -738,7 +742,7 @@ def column_generation(C):
             structureList[bestApertureIndex].rlist = rm
             # Precalculate the aperture map to save times.
             data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-            rmpres = solveRMC(YU)
+            rmpres = solveRMC(data.YU)
             print('I returned')
             ## List of apertures that was removed in this iteration
             #IndApRemovedThisStep = []
@@ -813,11 +817,10 @@ def printresults(iterationNumber, myfolder, Cvalue):
 def plotApertures(C):
     magnifier = 100
     ## Plotting apertures
-    xcoor = math.ceil(math.sqrt(data.numbeams))
-    ycoor = math.ceil(math.sqrt(data.numbeams))
-    nrows, ncols = M,N
-    print('numbeams', data.numbeams)
-    YU = (10.0 / 0.83)
+    xcoor = math.ceil(math.sqrt(beam.numBeams))
+    ycoor = math.ceil(math.sqrt(beam.numBeams))
+    nrows, ncols = beam.M, beam.N
+    print('numbeams', beam.numBeams)
     for mynumbeam in range(0, data.numbeams):
         lmag = data.llist[mynumbeam]
         rmag = data.rlist[mynumbeam]
@@ -831,13 +834,13 @@ def plotApertures(C):
         for i in range(0, M):
             image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam]
         image = np.repeat(image, magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
-        image[0,0] = YU # In order to get the right list of colors
+        image[0,0] = data.YU # In order to get the right list of colors
         # Set up a location where to save the figure
         fig = plt.figure(1)
         plt.subplot(ycoor,xcoor, mynumbeam + 1)
         cmapper = plt.get_cmap("autumn_r")
         cmapper.set_under('black', 1.0)
-        plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = YU)
+        plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
         plt.axis('off')
     fig.savefig('/home/wilmer/Dropbox/Research/VMAT/VMATwPenCode/outputGraphics/plotofapertures'+ str(C) + '.png')
 
