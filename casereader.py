@@ -440,7 +440,6 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         rightrange = range(math.ceil(max(l + 1, rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
         if (0 == len(rightrange)):
             midpoint = (angdistancep * rcm[0] + angdistancem * rcp[0])/(angdistancep + angdistancem)
-            print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
             rightrange = np.arange(midpoint, midpoint + 1)
             ##print('constraint rightrange at level ' + str(0) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[0], angdistancem, lcp[0], angdistancep', lcm[0], angdistancem, lcp[0], angdistancep, '\nFull left limits, rcp, rcm:', rcp, rcm, 'm: ', 0, 'predecesor: ', predec, 'succesor: ', succ)
         for r in rightrange:
@@ -484,6 +483,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw , rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
+                print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
                 rightrange = np.arange(midpoint, midpoint + 1)
                 ##print('constraint rightrange at level ' + str(m) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[m], angdistancem, lcp[m], angdistancep', lcm[m], angdistancem, lcp[m], angdistancep, '\nFull left limits, rcp, rcm:', rcp, rcm, 'm: ', m, 'predecesor: ', predec, 'succesor: ', succ)
             for r in rightrange:
