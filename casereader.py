@@ -46,12 +46,12 @@ class structure(object):
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
             self.threshold = 70
-            self.overdoseCoeff = 0.1
-            self.underdoseCoeff = 10
+            self.overdoseCoeff = 0.01
+            self.underdoseCoeff = 1
         else:
             structure.numOARs += 1
             self.threshold = 10
-            self.overdoseCoeff = 5
+            self.overdoseCoeff = 0.5
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
@@ -301,6 +301,7 @@ class problemData():
         self.diagmakers = [[] for i in range(beam.numBeams)]
         self.strengths = [[] for i in range(beam.numBeams)]
         self.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+        self.currentIntensities = np.zeros(beam.numBeams, dtype=float)
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -603,7 +604,7 @@ def updateOpenAperture(i):
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
     openapertureStrength = []
-    D = DmatBig[BeamList[thisApertureIndex].StartBeamletIndex:BeamList[thisApertureIndex].EndBeamletIndex, ]
+    D = DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex, ]
     diagmaker = np.zeros(D.shape[0], dtype = float)
     for m in range(0, len(beamList[i].llist)):
         # Find geographical values of llist and rlist.
@@ -667,14 +668,13 @@ def calcObjGrad(x, user_data = None):
     return(data.objectiveValue, data.aperturegradient)
 
 def solveRMC(YU):
-    ## IPOPT SOLUTION
     start = time.time()
     numbe = data.caligraphicC.len()
 
     calcObjGrad(data.currentIntensities)
     # Create the boundaries making sure that the only free variables are the ones with perfectly defined apertures.
     boundschoice = []
-    for thisindex in range(0, data.numbeams):
+    for thisindex in range(0, beam.numBeams):
         if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
             boundschoice.append((0, YU))
         else:
@@ -724,11 +724,12 @@ def column_generation(C):
             data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
             data.notinC.removeIndex(bestApertureIndex)
             # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
-            data.llist[bestApertureIndex] = lm
-            data.rlist[bestApertureIndex] = rm
+            structureList[bestApertureIndex].llist = lm
+            structureList[bestApertureIndex].rlist = rm
             # Precalculate the aperture map to save times.
             data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
             rmpres = solveRMC(YU)
+            print('I returned')
             ## List of apertures that was removed in this iteration
             IndApRemovedThisStep = []
             entryCounter = 0
