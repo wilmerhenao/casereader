@@ -195,7 +195,7 @@ for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
     structureList.append(structure(dpdata.Structures[s]))
     structureDict[structureList[s].Id] = s
-    print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].StartPointIndex)
+    print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 #----------------------------------------------------------------------------------------
@@ -244,7 +244,7 @@ def getDmatrixPieces():
 
     ## Read the beams now.
     counter = 0
-    for fl in datafiles[0:1]:
+    for fl in datafiles[2:3]:
         counter+=1
         print('reading datafile:', counter,fl)
         dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -834,7 +834,7 @@ def plotApertures(C):
 
 data = problemData()
 CValue = 1.0
-column_generation(0)
+column_generation(1.0)
 
 
 
