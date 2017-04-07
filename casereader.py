@@ -12,6 +12,8 @@ from multiprocessing import Pool
 from functools import partial
 import socket
 import math
+import pylab
+import matplotlib.pyplot as plt
 
 numcores = 6
 
@@ -296,6 +298,7 @@ class problemData():
         self.quadHelperThresh = np.empty(voxel.numVoxels, dtype = float)
         self.quadHelperOver = np.empty(voxel.numVoxels, dtype = float)
         self.quadHelperUnder = np.empty(voxel.numVoxels, dtype = float)
+        self.maskValue = np.empty(voxel.numVoxels, dtype = float)
         self.setQuadHelpers(structureList, voxelList)
         self.openApertureMaps = [[] for i in range(beam.numBeams)]
         self.diagmakers = [[] for i in range(beam.numBeams)]
@@ -309,6 +312,7 @@ class problemData():
             self.quadHelperThresh[i] = sList[sid].threshold
             self.quadHelperOver[i] = sList[sid].overdoseCoeff
             self.quadHelperUnder[i] = sList[sid].underdoseCoeff
+            self.maskValue[i] = 2**sid
 
     def calcDose(self):
         self.currentDose = np.zeros(voxel.numVoxels, dtype = float)
@@ -563,7 +567,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw)
     if __name__ == '__main__':
         pool = Pool(processes = numcores)              # process per MP
-        respool = pool.map(partialparsubpp, data.notinC.loc)
+        respool = pool.map(partialparsubpp, data.notinC.loc[0:6])
     pool.close()
     pool.join()
 
@@ -731,75 +735,73 @@ def column_generation(C):
             rmpres = solveRMC(YU)
             print('I returned')
             ## List of apertures that was removed in this iteration
-            IndApRemovedThisStep = []
-            entryCounter = 0
-            for thisindex in range(0, data.numbeams):
-                if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
-                    if (rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
+            #IndApRemovedThisStep = []
+            #entryCounter = 0
+            #for thisindex in range(0, data.numbeams):
+            #    if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
+            #        if (rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
                         ## Maintain a tally of apertures that are being removed
-                        entryCounter += 1
-                        IndApRemovedThisStep.append(thisindex)
-                        # Remove from caligraphicC and add to notinC
-                        data.notinC.insertAngle(thisindex, data.pointtoAngle[thisindex])
-                        data.caligraphicC.removeIndex(thisindex)
-            print('Indapremoved this step:', IndApRemovedThisStep)
+            #            entryCounter += 1
+            #            IndApRemovedThisStep.append(thisindex)
+            #            # Remove from caligraphicC and add to notinC
+            #            data.notinC.insertAngle(thisindex, data.pointtoAngle[thisindex])
+            #            data.caligraphicC.removeIndex(thisindex)
+            #print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
-            data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
+            #data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
             optimalvalues.append(rmpres.fun)
             plotcounter = plotcounter + 1
-            printresults(plotcounter, '/home/wilmer/Dropbox/Research/VMAT/VMATwPenCode/outputGraphics/', C)
+            printresults(plotcounter, '/home/wilmer/Dropbox/Research/VMAT/casereader/outputGraphics/', C)
             #Step 5 on Fei's paper. If necessary complete the treatment plan by identifying feasible apertures at control points c
             #notinC and denote the final set of fluence rates by yk
     plotApertures(C)
 
 # The next function prints DVH values
 def printresults(iterationNumber, myfolder, Cvalue):
-    numzvectors = 1
-    maskValueFull = np.array([int(i) for i in data.fullMaskValue])
+    namesStructures = list(structureDict.keys())
+    data.maskValue = np.array([int(i) for i in data.maskValue])
+    structuresAvailable = [int(x) for x in np.log2(np.unique(data.maskValue))]
+    namesStructures = namesStructures[structuresAvailable]
     print('Starting to Print Results')
-    for i in range(0, numzvectors):
-        zvalues = data.currentDose
-        maxDose = max([float(i) for i in zvalues])
-        dose_resln = 0.1
-        dose_ub = maxDose + 10
-        bin_center = np.arange(0,dose_ub,dose_resln)
-        # Generate holder matrix
-        dvh_matrix = np.zeros((data.numstructs, len(bin_center)))
-        # iterate through each structure
-        for s in range(0,data.numstructs):
-            allNames[s] = allNames[s].replace("_VOILIST.mat", "")
-            doseHolder = sorted(zvalues[[i for i,v in enumerate(maskValueFull & 2**s) if v > 0]])
-            if 0 == len(doseHolder):
-                continue
-            histHolder = []
-            carryinfo = 0
-            histHolder, garbage = np.histogram(doseHolder, bin_center)
-            histHolder = np.append(histHolder, 0)
-            histHolder = np.cumsum(histHolder)
-            dvhHolder = 1-(np.matrix(histHolder)/max(histHolder))
-            dvh_matrix[s,] = dvhHolder
+    zvalues = data.currentDose
+    maxDose = max([float(i) for i in zvalues])
+    dose_resln = 0.1
+    dose_ub = maxDose + 10
+    bin_center = np.arange(0,dose_ub,dose_resln)
+    # Generate holder matrix
+    dvh_matrix = np.zeros((structure.numStructures, len(bin_center)))
+    # iterate through each structure
+    for s in range(0, structure.numStructures):
+        doseHolder = sorted(zvalues[[i for i,v in enumerate(data.maskValue & 2**s) if v > 0]])
+        if 0 == len(doseHolder):
+            continue
+        histHolder, garbage = np.histogram(doseHolder, bin_center)
+        histHolder = np.append(histHolder, 0)
+        histHolder = np.cumsum(histHolder)
+        dvhHolder = 1-(np.matrix(histHolder)/max(histHolder))
+        dvh_matrix[s,] = dvhHolder
 
     myfig = pylab.plot(bin_center, dvh_matrix.T, linewidth = 2.0)
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
     plt.title('Iteration: ' + str(iterationNumber))
-    plt.legend(allNames,prop={'size':9})
+    plt.legend(namesStructures, prop={'size':9})
     plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT.png')
     plt.close()
 
-    voitoplot = [18, 7, 12, 13, 14, 15, 19, 20]
-    dvhsub2 = dvh_matrix[voitoplot,]
-    myfig2 = pylab.plot(bin_center, dvhsub2.T, linewidth = 1.0, linestyle = '--')
-    pylab.xlim([0, 120])
-    plt.grid(True)
-    plt.xlabel('Dose Gray')
-    plt.ylabel('Fractional Volume')
-    plt.title('VMAT DVH Plot')
-    #allNames.reverse()
-    #plt.legend([allNames[i] for i in voitoplot])
-    plt.legend(['PTV 1', 'PTV 2', 'Left Optic Nerve', 'Right Optic Nerve', 'Left Parotid', 'Right Parotid', 'Spinal Cord', 'Spinal Cord PRV'],prop={'size':9})
-    plt.savefig(myfolder + 'DVHMAT' + str(Cvalue) + '.png')
+    # voitoplot = [18, 7, 12, 13, 14, 15, 19, 20]
+    # dvhsub2 = dvh_matrix[voitoplot,]
+    # myfig2 = pylab.plot(bin_center, dvhsub2.T, linewidth = 1.0, linestyle = '--')
+    # pylab.xlim([0, 120])
+    # plt.grid(True)
+    # plt.xlabel('Dose Gray')
+    # plt.ylabel('Fractional Volume')
+    # plt.title('VMAT DVH Plot')
+    # #allNames.reverse()
+    # #plt.legend([allNames[i] for i in voitoplot])
+    # plt.legend(['PTV 1', 'PTV 2', 'Left Optic Nerve', 'Right Optic Nerve', 'Left Parotid', 'Right Parotid', 'Spinal Cord', 'Spinal Cord PRV'],prop={'size':9})
+    # plt.savefig(myfolder + 'DVHMAT' + str(Cvalue) + '.png')
     plt.close()
 
 def plotApertures(C):
@@ -837,16 +839,10 @@ data = problemData()
 CValue = 1.0
 column_generation(1.0)
 
-
-
-
-
 sys.exit()
 f = open(datafiles[0], "rb")
 dpdata.ParseFromString(f.read())
 f.close()
-
-
 
 beamnumperbeam = [None] * numbeams
 beamletsperbeam = [None] * numbeams
