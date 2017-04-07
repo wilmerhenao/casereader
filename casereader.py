@@ -440,6 +440,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         rightrange = range(math.ceil(max(l + 1, rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
         if (0 == len(rightrange)):
             midpoint = (angdistancep * rcm[0] + angdistancem * rcp[0])/(angdistancep + angdistancem)
+            print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
             rightrange = np.arange(midpoint, midpoint + 1)
             ##print('constraint rightrange at level ' + str(0) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[0], angdistancem, lcp[0], angdistancep', lcm[0], angdistancem, lcp[0], angdistancep, '\nFull left limits, rcp, rcm:', rcp, rcm, 'm: ', 0, 'predecesor: ', predec, 'succesor: ', succ)
         for r in rightrange:
@@ -477,6 +478,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
+            print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
             rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw , rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
@@ -604,7 +606,6 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
         Perimeter += np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1])
     Perimeter += r[len(r)-1] - l[len(l)-1] + np.sign(r[len(r)-1] - l[len(l)-1])
     Kellymeasure = Perimeter / Area
-    print('the pstar to be sent:', pstar)
     return(pstar, l, r, bestApertureIndex)
 
 ## This function returns the set of available AND open beamlets for the selected aperture (i).
@@ -707,7 +708,7 @@ def column_generation(C):
     eliminationThreshold = 10E-3
     ## Maximum leaf speed
     vmax = 5 * 2.25 # 2.25 cms per second
-    data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
+    data.speedlim = 6  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
     data.RU = 10.0
     ## Maximum intensity
