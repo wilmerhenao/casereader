@@ -18,12 +18,20 @@ import matplotlib.pyplot as plt
 numcores = 6
 
 gc.enable()
-thismachine = socket.gethostname()
+## Find out the variables according to the hostname
 datalocation = '~'
-if 'radiation-math' == socket.gethostname():
+if 'radiation-math' == socket.gethostname(): # LAB
     datalocation = "/mnt/fastdata/Data/spine"
-if 'sharkpool' == socket.gethostname():
+    dropbox = "/mnt/datadrive/Dropbox"
+if 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine/"
+    dropbox = "/home/wilmer/Dropbox"
+elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
+    datalocation = "/scratch/engin_flux/wilmer/spine"
+    dropbox = "/home/wilmer/Dropbox"
+else:
+    datalocation = "/home/wilmer/Dropbox/Data/spine/" # MY LAPTOP
+    dropbox = "/home/wilmer/Dropbox"
 
 ## This class contains a structure (region)
 class structure(object):
@@ -280,11 +288,6 @@ def eliminateListofStructures(killlist, vlist, blist, dlist):
 #vlist, blist, dlist = eliminateListofStructures(killlist, vlist, blist, dlist)
 #print('after')
 #print(len(vlist), len(blist), len(dlist))
-print('voxels used:', np.unique(vlist))
-DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
-del vlist
-del blist
-del dlist
 
 print('total time reading dose to points:', time.time() - start)
 #------------------------------------------------------------------------------------------------------------------
@@ -303,8 +306,11 @@ class problemData():
         self.openApertureMaps = [[] for i in range(beam.numBeams)]
         self.diagmakers = [[] for i in range(beam.numBeams)]
         self.strengths = [[] for i in range(beam.numBeams)]
-        self.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+        self.DlistT = None
         self.currentIntensities = np.zeros(beam.numBeams, dtype=float)
+        self.voxelsUsed = None
+        self.structuresUsed = None
+        self.structureIndexUsed = None
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -751,18 +757,15 @@ def column_generation(C):
             #data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
             optimalvalues.append(rmpres.fun)
             plotcounter = plotcounter + 1
-            printresults(plotcounter, '/home/wilmer/Dropbox/Research/VMAT/casereader/outputGraphics/', C)
+            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             #Step 5 on Fei's paper. If necessary complete the treatment plan by identifying feasible apertures at control points c
             #notinC and denote the final set of fluence rates by yk
     plotApertures(C)
 
 # The next function prints DVH values
 def printresults(iterationNumber, myfolder, Cvalue):
-    namesStructures = list(structureDict.keys())
     data.maskValue = np.array([int(i) for i in data.maskValue])
-    structuresAvailable = [int(x) for x in np.log2(np.unique(data.maskValue))]
-    namesStructures = namesStructures[structuresAvailable]
-    print('Starting to Print Results')
+    print('Starting to Print Result DVHs')
     zvalues = data.currentDose
     maxDose = max([float(i) for i in zvalues])
     dose_resln = 0.1
@@ -771,7 +774,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     # Generate holder matrix
     dvh_matrix = np.zeros((structure.numStructures, len(bin_center)))
     # iterate through each structure
-    for s in range(0, structure.numStructures):
+    for s in data.structureIndexUsed:
         doseHolder = sorted(zvalues[[i for i,v in enumerate(data.maskValue & 2**s) if v > 0]])
         if 0 == len(doseHolder):
             continue
@@ -780,13 +783,16 @@ def printresults(iterationNumber, myfolder, Cvalue):
         histHolder = np.cumsum(histHolder)
         dvhHolder = 1-(np.matrix(histHolder)/max(histHolder))
         dvh_matrix[s,] = dvhHolder
+    print('matrix shape:', dvh_matrix.shape)
+    dvh_matrix = dvh_matrix[data.structureIndexUsed,]
+    print(dvh_matrix.shape)
 
     myfig = pylab.plot(bin_center, dvh_matrix.T, linewidth = 2.0)
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
     plt.title('Iteration: ' + str(iterationNumber))
-    plt.legend(namesStructures, prop={'size':9})
+    plt.legend(data.structuresUsed, prop={'size':9})
     plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT.png')
     plt.close()
 
@@ -836,6 +842,23 @@ def plotApertures(C):
     fig.savefig('/home/wilmer/Dropbox/Research/VMAT/VMATwPenCode/outputGraphics/plotofapertures'+ str(C) + '.png')
 
 data = problemData()
+data.voxelsUsed = np.unique(vlist)
+strsUsd = set([])
+strsIdxUsd = set([])
+for v in data.voxelsUsed:
+    strsUsd.add(voxelList[v].StructureId)
+    strsIdxUsd.add(structureDict[voxelList[v].StructureId])
+data.structuresUsed = list(strsUsd)
+data.structureIndexUsed = list(strsIdxUsd)
+print('voxels used:', data.voxelsUsed)
+print('structures used:', data.structureIndexUsed)
+
+DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
+del vlist
+del blist
+del dlist
+data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+
 CValue = 1.0
 column_generation(1.0)
 
