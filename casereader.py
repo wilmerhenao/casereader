@@ -15,7 +15,7 @@ import math
 import pylab
 import matplotlib.pyplot as plt
 
-numcores = 6
+numcores = 8
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -578,7 +578,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw)
     if __name__ == '__main__':
         pool = Pool(processes = numcores)              # process per MP
-        respool = pool.map(partialparsubpp, data.notinC.loc[0:6])
+        respool = pool.map(partialparsubpp, data.notinC.loc)
     pool.close()
     pool.join()
 
