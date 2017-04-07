@@ -590,8 +590,8 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     r = bestgroup[2]
     bestApertureIndex = bestgroup[3]
     # Change the leaf positions for this particular beam
-    structureList[bestApertureIndex].llist = l
-    structureList[bestApertureIndex].rlist = r
+    beamList[bestApertureIndex].llist = l
+    beamList[bestApertureIndex].rlist = r
     print("Best aperture was: ", bestApertureIndex)
     # Calculate Kelly's aperture measure
     Area = 0.0
@@ -739,8 +739,8 @@ def column_generation(C):
             data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
             data.notinC.removeIndex(bestApertureIndex)
             # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
-            structureList[bestApertureIndex].llist = lm
-            structureList[bestApertureIndex].rlist = rm
+            beamList[bestApertureIndex].llist = lm
+            beamList[bestApertureIndex].rlist = rm
             # Precalculate the aperture map to save times.
             data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
             data.rmpres = solveRMC(data.YU)
