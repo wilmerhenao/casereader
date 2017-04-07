@@ -23,7 +23,7 @@ datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
     datalocation = "/mnt/fastdata/Data/spine"
     dropbox = "/mnt/datadrive/Dropbox"
-if 'sharkpool' == socket.gethostname(): # MY HOUSE
+elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine/"
     dropbox = "/home/wilmer/Dropbox"
 elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
