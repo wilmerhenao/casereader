@@ -21,7 +21,7 @@ organList = [6, 11, 13, 14, 15]
 fullcase = [9, 32, 13, 31, 29, 1, 11]
 testcase = [1]
 numcores = 8
-debugmode = True
+debugmode = False
 easyread = False
 
 gc.enable()
@@ -527,7 +527,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             #                    rcp[m] - vmaxp * (angdistancep / speedlim) / bw)))
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
-                #print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
+                print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
                 rightrange = np.arange(midpoint, midpoint + 1)
             for r in rightrange:
                 nodesinpreviouslevel += 1
