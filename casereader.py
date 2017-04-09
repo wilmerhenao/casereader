@@ -18,8 +18,8 @@ import pickle
 
 # List of organs that will be used
 organList = [6, 11, 13, 14, 15]
-fullcase = [23, 24, 25, 26, 7, 15, 16, 18]
-testcase = [18]
+fullcase = [9, 32, 13, 31, 29, 1, 11]
+testcase = [1]
 numcores = 8
 debugmode = True
 easyread = False
@@ -203,6 +203,7 @@ dpdata = dose_to_points_data_pb2.DoseToPointsData()
 f = open(datafiles.pop(0), "rb")
 dpdata.ParseFromString(f.read())
 f.close()
+datafiles.sort()
 #----------------------------------------------------------------------------------------
 # Get the data about the structures
 numstructs = len(dpdata.Structures)
@@ -301,6 +302,7 @@ def getDmatrixPieces():
                 bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
                 dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
             gc.collect()
+            #print('structure and first voxel', counter-1, dpdata.PointDoses[0].Index)
 
         print('case cleanup')
         newbcps = []
