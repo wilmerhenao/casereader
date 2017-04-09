@@ -14,12 +14,15 @@ import socket
 import math
 import pylab
 import matplotlib.pyplot as plt
-import itertools
+import pickle
 
 # List of organs that will be used
 organList = [6, 11, 13, 14, 15]
+fullcase = [23, 24, 25, 26, 7, 15, 16, 18]
+testcase = [18]
 numcores = 8
 debugmode = True
+easyread = False
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -252,70 +255,75 @@ gc.collect()
 start = time.time()
 
 def getDmatrixPieces():
-    ## Initialize vectors for voxel component, beamlet component and dose
-    vcps = []
-    bcps = []
-    dcps = []
 
-    counter = 0
-    fullcase = [23,24,25,26,7,15,16,18]
-    testcase = [18]
-    thiscase = fullcase
-    if debugmode:
-        thiscase = testcase
-
-    # Get the ranges of the voxels that I am going to use and eliminate the rest
-    myranges = []
-    for i in organList:
-        myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
-        
-    ## Read the beams now.      
-    for fl in [datafiles[x] for x in thiscase]:
-        counter+=1
-        print('reading datafile:', counter,fl)
-        dpdata = dose_to_points_data_pb2.DoseToPointsData()
-
-        f = open(fl, "rb")
-        dpdata.ParseFromString(f.read())
+    if easyread:
+        if debugmode:
+            PIK = 'testdump.dat'
+        else:
+            PIK = 'fullcasedump.dat'
+        with open(PIK, "rb") as f:
+            datasave = pickle.load(f)
         f.close()
 
-        for dp in dpdata.PointDoses:
-            numbeamletDoses = len(dp.BeamletDoses)
-            vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
-            bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
-            dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
-        gc.collect()
-    
-    print('Finished reading, organizing the ')
-    newbcps = []
-    newvcps = []
-    newdcps = []
-    start = time.time()
-    for i in vcps:
-        for m in myranges:
-            if vcps[i] in m:
-                newbcps.append(bcps[i])
-                newvcps.append(vcps[i])
-                newdcps.append(dcps[i])
-                #print('my tf:', tf)
-    print('len before', len(vcps))
-    print('len after', len(newvcps))
-    print('done in time:', time.time() - start)
-    return(vcps, bcps, dcps)
+        newbcps = datasave[0]
+        newvcps = datasave[1]
+        newdcps = datasave[2]
 
-vlist, blist, dlist = getDmatrixPieces()
+    else:
+        ## Initialize vectors for voxel component, beamlet component and dose
+        vcps = []
+        bcps = []
+        dcps = []
 
-killlist = range(17,23)
+        counter = 0
+        thiscase = fullcase
+        if debugmode:
+            thiscase = testcase
 
-def eliminateListofStructures(killlist, vlist, blist, dlist):
-    vkills = []
-    for i in killlist:
-        vkills += list(range(structureList[i].StartPointIndex, (structureList[i].EndPointIndex+1)))
-        structureList[i].isKilled = True
-    vlist = [vlist[ind] for ind, x in enumerate(blist) if x not in vkills]
-    dlist = [dlist[ind] for ind, x in enumerate(blist) if x not in vkills]
-    blist = [x for ind, x in enumerate(blist) if x not in vkills]
-    return(vlist, blist, dlist)
+        # Get the ranges of the voxels that I am going to use and eliminate the rest
+        myranges = []
+        for i in organList:
+            myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+
+        ## Read the beams now.
+        for fl in [datafiles[x] for x in thiscase]:
+            counter+=1
+            print('reading datafile:', counter,fl)
+            dpdata = dose_to_points_data_pb2.DoseToPointsData()
+
+            f = open(fl, "rb")
+            dpdata.ParseFromString(f.read())
+            f.close()
+
+            for dp in dpdata.PointDoses:
+                numbeamletDoses = len(dp.BeamletDoses)
+                vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
+                bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
+                dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
+            gc.collect()
+
+        print('case cleanup')
+        newbcps = []
+        newvcps = []
+        newdcps = []
+        start = time.time()
+        for i in range(len(vcps)):
+            for m in myranges:
+                if vcps[i] in m:
+                    newbcps.append(bcps[i])
+                    newvcps.append(vcps[i])
+                    newdcps.append(dcps[i])
+        print('voxels seen:', np.unique(newvcps))
+        datasave = [newbcps, newvcps, newdcps]
+        if debugmode:
+            PIK = 'testdump.dat'
+        else:
+            PIK = 'fullcasedump.dat'
+        with open(PIK, "wb") as f:
+            pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+        f.close()
+
+    return(newvcps, newbcps, newdcps)
 
 #print(len(vlist), len(blist), len(dlist))
 #vlist, blist, dlist = eliminateListofStructures(killlist, vlist, blist, dlist)
@@ -882,6 +890,7 @@ def plotApertures(C):
         plt.axis('off')
     fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
 
+vlist, blist, dlist = getDmatrixPieces()
 data = problemData()
 data.voxelsUsed = np.unique(vlist)
 strsUsd = set([])
