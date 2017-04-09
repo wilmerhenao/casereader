@@ -14,8 +14,12 @@ import socket
 import math
 import pylab
 import matplotlib.pyplot as plt
+import itertools
 
+# List of organs that will be used
+organList = [6, 11, 13, 14, 15]
 numcores = 8
+debugmode = True
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -253,9 +257,20 @@ def getDmatrixPieces():
     bcps = []
     dcps = []
 
-    ## Read the beams now.
     counter = 0
-    for fl in datafiles[0:10]:
+    fullcase = [23,24,25,26,7,15,16,18]
+    testcase = [18]
+    thiscase = fullcase
+    if debugmode:
+        thiscase = testcase
+
+    # Get the ranges of the voxels that I am going to use and eliminate the rest
+    myranges = []
+    for i in organList:
+        myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+        
+    ## Read the beams now.      
+    for fl in [datafiles[x] for x in thiscase]:
         counter+=1
         print('reading datafile:', counter,fl)
         dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -270,7 +285,24 @@ def getDmatrixPieces():
             bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
             dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
         gc.collect()
+    
+    print('Finished reading, organizing the ')
+    newbcps = []
+    newvcps = []
+    newdcps = []
+    start = time.time()
+    for i in vcps:
+        for m in myranges:
+            if vcps[i] in m:
+                newbcps.append(bcps[i])
+                newvcps.append(vcps[i])
+                newdcps.append(dcps[i])
+                #print('my tf:', tf)
+    print('len before', len(vcps))
+    print('len after', len(newvcps))
+    print('done in time:', time.time() - start)
     return(vcps, bcps, dcps)
+
 vlist, blist, dlist = getDmatrixPieces()
 
 killlist = range(17,23)
@@ -480,14 +512,13 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
             rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
-            print('what happened before:', math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )),
-                  math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem / speedlim) / bw,
-                                rcp[m] - vmaxp * (angdistancep / speedlim) / bw)))
+            #print('what happened before:', math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )),
+            #      math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem / speedlim) / bw,
+            #                    rcp[m] - vmaxp * (angdistancep / speedlim) / bw)))
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
-                print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
+                #print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
                 rightrange = np.arange(midpoint, midpoint + 1)
-                ##print('constraint rightrange at level ' + str(m) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[m], angdistancem, lcp[m], angdistancep', lcm[m], angdistancem, lcp[m], angdistancep, '\nFull left limits, rcp, rcm:', rcp, rcm, 'm: ', m, 'predecesor: ', predec, 'succesor: ', succ)
             for r in rightrange:
                 nodesinpreviouslevel += 1
                 thisnode += 1
@@ -582,7 +613,10 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw)
     if __name__ == '__main__':
         pool = Pool(processes = numcores)              # process per MP
-        respool = pool.map(partialparsubpp, data.notinC.loc)
+        locstotest = data.notinC.loc
+        if debugmode:
+            locstotest = data.notinC.loc[0:numcores]
+        respool = pool.map(partialparsubpp, locstotest)
     pool.close()
     pool.join()
 
