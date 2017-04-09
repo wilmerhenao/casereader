@@ -22,7 +22,7 @@ fullcase = [9, 32, 13, 31, 29, 1, 11]
 testcase = [1]
 numcores = 8
 debugmode = False
-easyread = False
+easyread = True
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -62,13 +62,13 @@ class structure(object):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
-            self.threshold = 70
-            self.overdoseCoeff = 0.01
-            self.underdoseCoeff = 1
+            self.threshold = 39
+            self.overdoseCoeff = 0.0000001
+            self.underdoseCoeff = 0.005
         else:
             structure.numOARs += 1
-            self.threshold = 10
-            self.overdoseCoeff = 0.5
+            self.threshold = 0
+            self.overdoseCoeff = 0.00001
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
@@ -119,7 +119,7 @@ class beamlet(object):
         beamlet.numBeamlets += 1
         self.Index = sthing.Index
         self.XStart = sthing.XStart + 35 # Make everything start at zero
-        self.YStart = sthing.YStart + 35
+        self.YStart = sthing.YStart
         beamlet.XSize = sthing.XSize
         beamlet.YSize = sthing.YSize
         self.belongsToBeam = None
@@ -194,7 +194,6 @@ def get_files_by_file_size(dirname, reverse=False):
     return(filepaths)
 
 datafiles = get_files_by_file_size(datalocation)
-print(datafiles)
 
 # The first file will contain all the structure data, the rest will contain pointodoses.
 dpdata = dose_to_points_data_pb2.DoseToPointsData()
@@ -258,6 +257,7 @@ start = time.time()
 def getDmatrixPieces():
 
     if easyread:
+        print('doing an easyread')
         if debugmode:
             PIK = 'testdump.dat'
         else:
@@ -452,23 +452,20 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         lcp = beamList[succ].llist
         rcp = beamList[succ].rlist
 
-    validbeamlets, validbeamletspecialrange = fvalidbeamlets(thisApertureIndex)
-    # First handle the calculations for the first row
+    # Handle the calculations for the first row
     beamGrad = D * data.voxelgradient
-    # Keep the location of the most leaf
 
     nodesinpreviouslevel = 0
-    oldflag = 0
     posBeginningOfRow = 1
     thisnode = 0
     # Max beamlets per row
-    bpr = rightEdge - leftEdge + 2
+    bpr = rightEdge - leftEdge + 2 # the ones inside plus the two edges
     networkNodesNumber = bpr * bpr + M * bpr * bpr + bpr * bpr # An overestimate of the network nodes in this network
     # Initialization of network vectors. This used to be a list before
     lnetwork = np.zeros(networkNodesNumber, dtype = np.int) #left limit vector
     rnetwork = np.zeros(networkNodesNumber, dtype = np.int) #right limit vector
     mnetwork = np.ones(networkNodesNumber, dtype = np.int) #Only to save some time in the first loop
-    wnetwork = np.empty(networkNodesNumber, dtype = np.float) # Weight Vector
+    wnetwork = np.empty(networkNodesNumber, dtype = np.float) # Weight Vector initialized with +\infty
     wnetwork[:] = np.inf
     dadnetwork = np.zeros(networkNodesNumber, dtype = np.int) # Dad Vector. Where Dad is the combination of (l,r) in previous row
     # Work on the first row perimeter and area values
@@ -490,8 +487,8 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             # First I have to make sure to add the beamlets that I am interested in
             if(l + 1 < r): # prints r numbers starting from l + 1. So range(3,4) = 3
                 ## Take integral pieces of the dose component
-                possiblebeamletsthisrow = np.intersect1d(range(int(np.ceil(l+1)),int(np.floor(r))), validbeamlets) - min(validbeamlets)
-                ## Calculate dose on the sides
+                possiblebeamletsthisrow = range(int(np.ceil(l+1)),int(np.floor(r)))
+                ## Calculate dose on the sides, the fractional component
                 DoseSide = -((np.ceil(l+1) - (l+1)) * beamGrad[int(np.floor(l+1))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
                 if (len(possiblebeamletsthisrow) > 0):
                     Dose = -beamGrad[ possiblebeamletsthisrow ].sum()
@@ -499,7 +496,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
                 else:
                     weight = C * ( C2 * (r - l) - C3 * b * (r - l)) + 10E-10 * (r-l) + DoseSide
             else:
-                weight = 0.0
+                weight = 0.0 # it is turned off
             # Create node (1,l,r) in array of existing nodes and update the counter
             # Replace the following expression
             lnetwork[thisnode] = l
@@ -507,11 +504,9 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = weight
             # dadnetwork and mnetwork don't need to be changed here for obvious reasons
     posBeginningOfRow += nodesinpreviouslevel
-    leftmostleaf = len(validbeamlets) - 1 # Position in python position(-1) of the leftmost leaf
+    leftmostleaf = 70 - 1 # Position in python position(-1) of the leftmost leaf
     # Then handle the calculations for the m rows. Nodes that are neither source nor sink.
     for m in range(1,M):
-        # Get the beamlets that are valid in this row in particular (all others are still valid but are zero)
-        validbeamlets, validbeamletspecialrange = fvalidbeamlets(thisApertureIndex)
         oldflag = nodesinpreviouslevel
         nodesinpreviouslevel = 0
         # And now process normally checking against valid beamlets
@@ -521,11 +516,9 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
-            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
-            #print('what happened before:', math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )),
-            #      math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem / speedlim) / bw,
-            #                    rcp[m] - vmaxp * (angdistancep / speedlim) / bw)))
+            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
             if (0 == len(rightrange)):
+                print(rightrange)
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
                 print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
                 rightrange = np.arange(midpoint, midpoint + 1)
@@ -538,7 +531,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
                 mnetwork[thisnode] = m
                 wnetwork[thisnode] = np.inf
                 # Select only those beamlets that are possible in between the (l,r) limits.
-                possiblebeamletsthisrow = np.intersect1d(range(int(np.ceil(l+1)),int(np.floor(r))), validbeamlets) + leftmostleaf# - min(validbeamlets)
+                possiblebeamletsthisrow = range(int(np.ceil(l+1)) + leftmostleaf, int(np.floor(r) + leftmostleaf))#
                 DoseSide = -((np.ceil(l+1) - (l+1)) * beamGrad[int(np.floor(l+1))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
                 if(len(possiblebeamletsthisrow) > 0):
                     Dose = -beamGrad[possiblebeamletsthisrow].sum()
@@ -557,7 +550,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
         posBeginningOfRow = nodesinpreviouslevel + posBeginningOfRow # This is the total number of network nodes
         # Keep the location of the leftmost leaf
-        leftmostleaf = len(validbeamlets) + leftmostleaf
+        leftmostleaf = 70 + leftmostleaf
     # thisnode gets augmented only 1 because only the sink node will be added
     thisnode += 1
     for mynode in (range(posBeginningOfRow - nodesinpreviouslevel, posBeginningOfRow )): # +1 because otherwise it could be empty
@@ -754,7 +747,7 @@ def column_generation(C):
     eliminationThreshold = 10E-3
     ## Maximum leaf speed
     vmax = 5 * 2.25 # 2.25 cms per second
-    data.speedlim = 6  # Values are in the VMATc paper page 2968. 0.85 < s < 6
+    data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
     data.RU = 10.0
     ## Maximum intensity
@@ -912,7 +905,7 @@ del dlist
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
 
 CValue = 1.0
-column_generation(1.0)
+column_generation(0.0)
 
 sys.exit()
 f = open(datafiles[0], "rb")
