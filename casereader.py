@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-organList = [6, 11, 13, 14, 15]
+structureListRestricted = [6, 11, 13, 14, 15]
 fullcase = [9, 32, 13, 31, 29, 1, 11]
 testcase = [1]
 numcores = 8
@@ -216,6 +216,9 @@ for s in range(numstructs):
     print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
+structureNames = []
+for s in structureListRestricted:
+    structureNames.append(structureList[s].Id)
 #----------------------------------------------------------------------------------------
 ## Get the data about beamlets
 numbeamlets = len(dpdata.Beamlets)
@@ -283,7 +286,7 @@ def getDmatrixPieces():
 
         # Get the ranges of the voxels that I am going to use and eliminate the rest
         myranges = []
-        for i in organList:
+        for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
 
         ## Read the beams now.
@@ -837,7 +840,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
     plt.title('Iteration: ' + str(iterationNumber))
-    plt.legend(data.structuresUsed, prop={'size':9})
+    plt.legend(structureNames, prop={'size':9})
     plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT.png')
     plt.close()
 
@@ -896,7 +899,7 @@ for v in data.voxelsUsed:
 data.structuresUsed = list(strsUsd)
 data.structureIndexUsed = list(strsIdxUsd)
 print('voxels used:', data.voxelsUsed)
-print('structures used:', data.structureIndexUsed)
+print('structures used in no particular order:', data.structureIndexUsed)
 
 DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
 del vlist
