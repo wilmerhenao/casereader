@@ -791,7 +791,7 @@ def column_generation(C):
             ## List of apertures that was removed in this iteration
             IndApRemovedThisStep = []
             entryCounter = 0
-            for thisindex in range(0, data.numbeams):
+            for thisindex in range(beam.numBeams):
                 if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
                     if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
                        ## Maintain a tally of apertures that are being removed
