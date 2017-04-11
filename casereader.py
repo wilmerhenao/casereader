@@ -361,6 +361,7 @@ class problemData():
         self.RU = None
         self.speedlim = None
         self.rmpres = None
+        self.listIndexofAperturesRemovedEachStep = []
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -798,7 +799,7 @@ def column_generation(C):
                         entryCounter += 1
                         IndApRemovedThisStep.append(thisindex)
                         # Remove from caligraphicC and add to notinC
-                        data.notinC.insertAngle(thisindex, data.pointtoAngle[thisindex])
+                        data.notinC.insertAngle(beamList[thisindex].location, beamList[thisindex].angle)
                         data.caligraphicC.removeIndex(thisindex)
             print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
