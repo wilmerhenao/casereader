@@ -804,6 +804,7 @@ def column_generation(C):
             print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
             data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
+            print('All apertures removed in each0 step:', data.listIndexofAperturesRemovedEachStep)
             optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
             printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
