@@ -64,7 +64,7 @@ class structure(object):
             structure.numTargets = structure.numTargets + 1
             self.threshold = 39
             self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 0.005
+            self.underdoseCoeff = 0.0005
         else:
             structure.numOARs += 1
             self.threshold = 0
@@ -786,20 +786,20 @@ def column_generation(C):
             data.rmpres = solveRMC(data.YU)
             print('I returned')
             ## List of apertures that was removed in this iteration
-            #IndApRemovedThisStep = []
-            #entryCounter = 0
-            #for thisindex in range(0, data.numbeams):
-            #    if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
-            #        if (rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
-                        ## Maintain a tally of apertures that are being removed
-            #            entryCounter += 1
-            #            IndApRemovedThisStep.append(thisindex)
-            #            # Remove from caligraphicC and add to notinC
-            #            data.notinC.insertAngle(thisindex, data.pointtoAngle[thisindex])
-            #            data.caligraphicC.removeIndex(thisindex)
-            #print('Indapremoved this step:', IndApRemovedThisStep)
+            IndApRemovedThisStep = []
+            entryCounter = 0
+            for thisindex in range(0, data.numbeams):
+                if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
+                    if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
+                       ## Maintain a tally of apertures that are being removed
+                        entryCounter += 1
+                        IndApRemovedThisStep.append(thisindex)
+                        # Remove from caligraphicC and add to notinC
+                        data.notinC.insertAngle(thisindex, data.pointtoAngle[thisindex])
+                        data.caligraphicC.removeIndex(thisindex)
+            print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
-            #data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
+            data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
             optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
             printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
