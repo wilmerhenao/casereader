@@ -20,9 +20,9 @@ import pickle
 structureListRestricted = [6,      11,    13,   14,     15   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor
-threshold  =              [15,     25,    16,   46,     13   ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-4,  0.0  ]
-overcoeff  =              [10E-5,10E-9, 10E-5,  10E-3,  10E-5]
+threshold  =              [0,      0,      0,      41,     0   ]
+undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
+overcoeff  =              [10E-6,10E-9, 10E-6,  10E-5,  10E-6]
 fullcase = [9, 32, 13, 31, 29, 1, 11]
 testcase = [1]
 numcores = 8
@@ -759,12 +759,12 @@ def column_generation(C):
     C2 = 1.0
     C3 = 1.0
     eliminationPhase = True # Whether you want to eliminate redundant apertures at the end
-    eliminationThreshold = 10E-2
+    eliminationThreshold = 0.01
     ## Maximum leaf speed
-    vmax = 5 * 2.25 # 2.25 cms per second
+    vmax = 5 * 3.25 # 2.25 cms per second
     data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
-    data.RU = 10.0
+    data.RU = 20.0
     ## Maximum intensity
     data.YU = data.RU / data.speedlim
     beamletwidth = 0.2
