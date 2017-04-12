@@ -17,7 +17,12 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-structureListRestricted = [6, 11, 13, 14, 15]
+structureListRestricted = [6,      11,    13,   14,     15   ]
+#limits                    27,     30,    24,   36-47,  22
+#names                     esof,   trach, prv2, tumor
+threshold  =              [15,     25,    16,   46,     13   ]
+undercoeff =              [0.0,    0.0,   0.0,  10E-4,  0.0  ]
+overcoeff  =              [10E-5,10E-9, 10E-5,  10E-3,  10E-5]
 fullcase = [9, 32, 13, 31, 29, 1, 11]
 testcase = [1]
 numcores = 8
@@ -62,9 +67,9 @@ class structure(object):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
-            self.threshold = 39
+            self.threshold = 42
             self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 0.0005
+            self.underdoseCoeff = 0.0004
         else:
             structure.numOARs += 1
             self.threshold = 0
@@ -216,9 +221,15 @@ for s in range(numstructs):
     print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
-structureNames = []
-for s in structureListRestricted:
-    structureNames.append(structureList[s].Id)
+# Manual modifications of targets
+if not debugmode:
+    print('modifying penalization function according to the 5 structure case')
+    strcounter = 0
+    for s in structureListRestricted:
+        structureList[s].underdoseCoeff = undercoeff[strcounter]
+        structureList[s].overdoseCoeff = overcoeff[strcounter]
+        structureList[s].threshold = threshold[strcounter]
+        strcounter += 1
 #----------------------------------------------------------------------------------------
 ## Get the data about beamlets
 numbeamlets = len(dpdata.Beamlets)
@@ -747,8 +758,8 @@ def solveRMC(YU):
 def column_generation(C):
     C2 = 1.0
     C3 = 1.0
-    eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
-    eliminationThreshold = 10E-3
+    eliminationPhase = True # Whether you want to eliminate redundant apertures at the end
+    eliminationThreshold = 10E-2
     ## Maximum leaf speed
     vmax = 5 * 2.25 # 2.25 cms per second
     data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
@@ -902,7 +913,10 @@ data.structuresUsed = list(strsUsd)
 data.structureIndexUsed = list(strsIdxUsd)
 print('voxels used:', data.voxelsUsed)
 print('structures used in no particular order:', data.structureIndexUsed)
-
+structureNames = []
+for s in data.structureIndexUsed:
+    structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
+print(structureNames)
 DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
 del vlist
 del blist
