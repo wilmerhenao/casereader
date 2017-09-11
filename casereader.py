@@ -20,14 +20,16 @@ import pickle
 structureListRestricted = [6,      11,    13,   14,     15   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor
-threshold  =              [0,      0,      0,      41,     0   ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
-overcoeff  =              [10E-6,10E-9, 10E-6,  10E-5,  10E-6]
-fullcase = [9, 32, 13, 31, 29, 1, 11]
+threshold  =              [5,      25,      5,      43,     5   ]
+undercoeff =              [0.0,    0.0,   0.0,  0.000085,  0.0  ]
+overcoeff  =              [5E-5,10E-10, 10E-5,  10E-5,  10E-6]
+fullcase = [9, 32, 13, 31, 29, 1, 11] # Files containing the 5 important structures
 testcase = [1]
 numcores = 8
 debugmode = False
 easyread = True
+refinementloops = True #This loop supercedes the eliminationPhase
+eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -69,10 +71,10 @@ class structure(object):
             structure.numTargets = structure.numTargets + 1
             self.threshold = 42
             self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 0.0004
+            self.underdoseCoeff = 10.0
         else:
             structure.numOARs += 1
-            self.threshold = 0
+            self.threshold = 15.0
             self.overdoseCoeff = 0.00001
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
@@ -104,6 +106,7 @@ class beam(object):
         self.rightEdge = 70
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
+        self.KellyMeasure = 0
 
 
 class voxel(object):
@@ -373,6 +376,7 @@ class problemData():
         self.speedlim = None
         self.rmpres = None
         self.listIndexofAperturesRemovedEachStep = []
+        self.listIndexofAperturesAddedEachStep = []
 
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
@@ -590,7 +594,6 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     l.pop(); r.pop()
     return(p, l, r)
 
-
 def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
     thisApertureIndex = i
     print("analysing available aperture" , thisApertureIndex)
@@ -611,6 +614,8 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
         angdistancep = np.inf
     else:
         succ = min(succs)
+        print('calC', data.caligraphicC)
+        print('notinc', data.notinC)
         angdistancep = data.caligraphicC(succ) - data.notinC(thisApertureIndex)
     if 0 == len(predecs):
         predec = []
@@ -618,10 +623,24 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
     else:
         predec = max(predecs)
         angdistancem = data.notinC(thisApertureIndex) - data.caligraphicC(predec)
-
     # Find Numeric value of previous and next angle.
     p, l, r = PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw)
     return(p,l,r,thisApertureIndex)
+
+def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth):
+    pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth)
+    # Calculate Kelly's aperture measure
+    Area = 0.0
+    Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
+    #for n in range(len(l)):
+    #    Area += 0.5 * (r[n] - l[n]) * 0.5
+    for n in range(1, len(l)):
+        Area += 1.0 * (r[n] - l[n]) / 5
+        Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
+        Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
+    Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
+    Kellymeasure = Perimeter / Area
+    return(pstar, l, r, bestApertureIndex, Kellymeasure)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     print("Choosing one aperture amongst the ones that are available")
@@ -651,16 +670,16 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     print("Best aperture was: ", bestApertureIndex)
     # Calculate Kelly's aperture measure
     Area = 0.0
-    Perimeter = r[0] - l[0] + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
-    for n in range(len(l)):
-        Area += 0.5 * (r[n] - l[n]) * 0.5
+    Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
+    #for n in range(len(l)):
+    #    Area += 0.5 * (r[n] - l[n]) * 0.5
     for n in range(1, len(l)):
-        Area += 0.5 * (r[n] - l[n]) * 0.5
+        Area += 1.0 * (r[n] - l[n]) / 5
         Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
-        Perimeter += np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1])
-    Perimeter += r[len(r)-1] - l[len(l)-1] + np.sign(r[len(r)-1] - l[len(l)-1])
+        Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
+    Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
     Kellymeasure = Perimeter / Area
-    return(pstar, l, r, bestApertureIndex)
+    return(pstar, l, r, bestApertureIndex, Kellymeasure)
 
 ## This function returns the set of available AND open beamlets for the selected aperture (i).
 # The idea is to have everything ready and pre-calculated for the evaluation of the objective function in
@@ -758,10 +777,10 @@ def solveRMC(YU):
 def column_generation(C):
     C2 = 1.0
     C3 = 1.0
-    eliminationPhase = True # Whether you want to eliminate redundant apertures at the end
-    eliminationThreshold = 0.01
+    #eliminationThreshold = 0.1 Wilmer:This one worked really Well
+    eliminationThreshold = 0.3
     ## Maximum leaf speed
-    vmax = 5 * 3.25 # 2.25 cms per second
+    vmax = 5 * 3.25 # 3.25 cms per second
     data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
     data.RU = 20.0
@@ -782,7 +801,7 @@ def column_generation(C):
         # Step 1 on Fei's paper. Use the information on the current treatment plan to formulate and solve an instance of the PP
         data.calcDose()
         data.calcGradientandObjValue()
-        pstar, lm, rm, bestApertureIndex = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
+        pstar, lm, rm, bestApertureIndex, kmeasure = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
         if pstar >= 0:
@@ -796,6 +815,7 @@ def column_generation(C):
             # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
             beamList[bestApertureIndex].llist = lm
             beamList[bestApertureIndex].rlist = rm
+            beamList[bestApertureIndex].KellyMeasure = kmeasure
             # Precalculate the aperture map to save times.
             data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
             data.rmpres = solveRMC(data.YU)
@@ -805,7 +825,7 @@ def column_generation(C):
             entryCounter = 0
             for thisindex in range(beam.numBeams):
                 if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
-                    if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase):
+                    if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase) & (not refinementloops):
                        ## Maintain a tally of apertures that are being removed
                         entryCounter += 1
                         IndApRemovedThisStep.append(thisindex)
@@ -814,14 +834,71 @@ def column_generation(C):
                         data.caligraphicC.removeIndex(thisindex)
             print('Indapremoved this step:', IndApRemovedThisStep)
             ## Save all apertures that were removed in this step
+            data.listIndexofAperturesAddedEachStep.append(bestApertureIndex)
             data.listIndexofAperturesRemovedEachStep.append(IndApRemovedThisStep)
-            print('All apertures removed in each0 step:', data.listIndexofAperturesRemovedEachStep)
+            print('All apertures added in each step:', data.listIndexofAperturesAddedEachStep)
+            print('All apertures removed in each step:', data.listIndexofAperturesRemovedEachStep)
             optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
-            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+            if eliminationPhase | refinementloops:
+                printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+            else:
+                printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE', C)
             #Step 5 on Fei's paper. If necessary complete the treatment plan by identifying feasible apertures at control points c
             #notinC and denote the final set of fluence rates by yk
+    # Set up an order to go refining one by one.
+    if refinementloops:
+        intensepengList = []
+        for mynumbeam in range(0, beam.numBeams):
+            intensepengList.append(data.rmpres.x[mynumbeam])
+        # pengList will contain a list of the different apertures in growing order of intensity
+        pengList = sorted(range(beam.numBeams), key = lambda k: intensepengList[k])
+        oldObjectiveValue = data.rmpres.fun
+        refinementLoopCounter = 0
+        while refinementLoopCounter < 2:
+            refinementLoopCounter += 1
+            for refaper in pengList:
+                data.calcDose()
+                data.calcGradientandObjValue()
+                data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
+                data.caligraphicC.removeIndex(refaper)
+                pstar, lm, rm, bestApertureIndex, kmeasure = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth)
+                # Update caligraphic C.
+                data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
+                data.notinC.removeIndex(bestApertureIndex)
+                if pstar >= 0:
+                    continue #No aperture can make things better
+                # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
+                beamList[bestApertureIndex].llist = lm
+                beamList[bestApertureIndex].rlist = rm
+                beamList[bestApertureIndex].KellyMeasure = kmeasure
+                # Precalculate the aperture map to save times.j
+                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+                data.rmpres = solveRMC(data.YU)
+            print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.001:
+                print('refinement produced less than 0.1 percent improvement in the last iteration')
+                #break
+            oldObjectiveValue = data.rmpres.fun
+            plotcounter = plotcounter + beam.numBeams
+        if eliminationPhase | refinementloops:
+            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+        else:
+            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
+                                 C)
+
     plotApertures(C)
+    mynumbeams = beam.numBeams
+    M = beam.M
+    N = beam.N
+    datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
+                data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures, structureList,
+                data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder]
+    PIK = "outputGraphics/pickle-C-" + str(C) + "-save.dat"
+    with open(PIK, "wb") as f:
+        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
+    return(data.rmpres.x)
 
 # The next function prints DVH values
 def printresults(iterationNumber, myfolder, Cvalue):
@@ -849,30 +926,17 @@ def printresults(iterationNumber, myfolder, Cvalue):
     print(dvh_matrix.shape)
 
     myfig = pylab.plot(bin_center, dvh_matrix.T, linewidth = 2.0)
+    pylab.xlim(0, 60)
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
     plt.title('Iteration: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
-    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT.png')
-    plt.close()
-
-    # voitoplot = [18, 7, 12, 13, 14, 15, 19, 20]
-    # dvhsub2 = dvh_matrix[voitoplot,]
-    # myfig2 = pylab.plot(bin_center, dvhsub2.T, linewidth = 1.0, linestyle = '--')
-    # pylab.xlim([0, 120])
-    # plt.grid(True)
-    # plt.xlabel('Dose Gray')
-    # plt.ylabel('Fractional Volume')
-    # plt.title('VMAT DVH Plot')
-    # #allNames.reverse()
-    # #plt.legend([allNames[i] for i in voitoplot])
-    # plt.legend(['PTV 1', 'PTV 2', 'Left Optic Nerve', 'Right Optic Nerve', 'Left Parotid', 'Right Parotid', 'Spinal Cord', 'Spinal Cord PRV'],prop={'size':9})
-    # plt.savefig(myfolder + 'DVHMAT' + str(Cvalue) + '.png')
+    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT' + str(Cvalue) + '.png')
     plt.close()
 
 def plotApertures(C):
-    magnifier = 100
+    magnifier = 50
     ## Plotting apertures
     xcoor = math.ceil(math.sqrt(beam.numBeams))
     ycoor = math.ceil(math.sqrt(beam.numBeams))
@@ -889,8 +953,8 @@ def plotApertures(C):
             # Reshape things into a 9x9 grid
         image = image.reshape((nrows, magnifier * ncols))
         for i in range(0, beam.M):
-            image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam]
-        image = np.repeat(image, magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
+            image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam] #intensity assignment
+        image = np.repeat(image, 7*magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
         image[0,0] = data.YU # In order to get the right list of colors
         # Set up a location where to save the figure
         fig = plt.figure(1)
@@ -900,6 +964,7 @@ def plotApertures(C):
         plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
         plt.axis('off')
     fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
+    plt.close()
 
 vlist, blist, dlist = getDmatrixPieces()
 data = problemData()
@@ -923,41 +988,15 @@ del blist
 del dlist
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
 
-CValue = 1.0
-column_generation(0.0)
+CValue = 0.001
+finalintensities = column_generation(CValue)
+averageNW = 0.0
+averageW = 0.0
+for i in range(beam.numBeams):
+    averageNW += beamList[i].KellyMeasure
+    averageW += beamList[i].KellyMeasure * finalintensities[i]
+
+print('averageW:', averageW/beam.numBeams)
+print('averageNW:', averageNW/beam.numBeams)
 
 sys.exit()
-f = open(datafiles[0], "rb")
-dpdata.ParseFromString(f.read())
-f.close()
-
-beamnumperbeam = [None] * numbeams
-beamletsperbeam = [None] * numbeams
-dijsPerBeam = [None] * numbeams
-
-numX = 0
-for b in range(numbeams):
-    beamletsperbeam[b] = dpdata.Beams[b].EndBeamletIndex - dpdata.Beams[b].StartBeamletIndex
-    numX = numX + beamletsperbeam[b]
-
-# The variables below were not added in the original document by Carlos.
-
-numpointdoses = len(dpdata.PointDoses)
-
-print('control points:', len(dpdata.Beams))
-print('Beamlets for the third beam:')
-for bmlet in range(1120, 1680):
-    print('whatisthis:',dpdata.Beamlets[bmlet].Index, dpdata.Beamlets[bmlet].BeamId, dpdata.Beamlets[bmlet].XSize, dpdata.Beamlets[bmlet].YSize, dpdata.Beamlets[bmlet].XStart, dpdata.Beamlets[bmlet].YStart)
-beamletcounter = [None] * (numbeams + 1)
-
-if (numpointdoses):
-    print("This file has point doses!")
-    print('total point doses so far:', len(dpdata.PointDoses))
-    print("Generating Dose Matrix Dimensions")
-    nDijs = 0
-    for j in range(numvoxels):
-        nDijs = nDijs + len(dpdata.PointDoses[j].BeamletDoses)
-    print(nDijs)
-    totaldijs = nDijs
-    print('total non-zero Dijs:', totaldijs)
-    print('Building Dose Matrix:')
