@@ -676,28 +676,45 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     listinorder = np.argsort(pvalues)
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
     indstars = chooseSmallest(listinorder, 10)
-    indstar = listinorder[0]
-    bestgroup = respool[indstar]
-    pstar = bestgroup[0]
-    l = bestgroup[1]
-    r = bestgroup[2]
-    bestApertureIndex = bestgroup[3]
-    # Change the leaf positions for this particular beam
-    beamList[bestApertureIndex].llist = l
-    beamList[bestApertureIndex].rlist = r
-    print("Best aperture was: ", bestApertureIndex)
-    # Calculate Kelly's aperture measure
-    Area = 0.0
-    Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
-    #for n in range(len(l)):
-    #    Area += 0.5 * (r[n] - l[n]) * 0.5
-    for n in range(1, len(l)):
-        Area += 1.0 * (r[n] - l[n]) / 5
-        Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
-        Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
-    Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
-    Kellymeasure = Perimeter / Area
-    return(pstar, l, r, bestApertureIndex, Kellymeasure)
+    # Initialize the lists that I'm going to return
+    pstarlist = []
+    llist = []
+    rlist = []
+    bestApertureIndexlist = []
+    Kellymeasurelist = []
+    goodaperturessent = 0
+    for indstar in indstars:
+        bestgroup = respool[indstar]
+        pstar = bestgroup[0]
+        if pstar > 0:
+            # Make sure that I report at least the pstar of the first one in case no one works
+            pstarlist.append(pstar)
+            break #Break the for because it cannot get any better now.
+        l = bestgroup[1]
+        r = bestgroup[2]
+        bestApertureIndex = bestgroup[3]
+        # Change the leaf positions for this particular beam
+        # beamList[bestApertureIndex].llist = l # This shouldn't be here. It should only be done after checking for pstar > 0
+        # beamList[bestApertureIndex].rlist = r
+        print("One of the best apertures was: ", bestApertureIndex)
+        # Calculate Kelly's aperture measure
+        Area = 0.0
+        Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
+        #for n in range(len(l)):
+        #    Area += 0.5 * (r[n] - l[n]) * 0.5
+        for n in range(1, len(l)):
+            Area += 1.0 * (r[n] - l[n]) / 5
+            Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
+            Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
+        Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
+        Kellymeasure = Perimeter / Area
+        pstarlist.append(pstar)
+        llist.append(l)
+        rlist.append(r)
+        bestApertureIndexlist.append(bestApertureIndex)
+        Kellymeasurelist.append(Kellymeasure)
+        goodaperturessent +=1
+    return(pstarlist, llist, rlist, bestApertureIndexlist, Kellymeasurelist, goodaperturessent)
 
 ## This function returns the set of available AND open beamlets for the selected aperture (i).
 # The idea is to have everything ready and pre-calculated for the evaluation of the objective function in
@@ -819,23 +836,28 @@ def column_generation(C):
         # Step 1 on Fei's paper. Use the information on the current treatment plan to formulate and solve an instance of the PP
         data.calcDose()
         data.calcGradientandObjValue()
-        pstar, lm, rm, bestApertureIndex, kmeasure = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
+        pstarlist, lmlist, rmlist, bestApertureIndexlist, kmeasurelist, goodaperturesreceived = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
-        if pstar >= 0:
+        if pstarlist[0] >= 0:
             #This choice includes the case when no aperture was selected
             print('Program finishes because no aperture was selected to enter')
             break
         else:
-            # Update caligraphic C.
-            data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
-            data.notinC.removeIndex(bestApertureIndex)
-            # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
-            beamList[bestApertureIndex].llist = lm
-            beamList[bestApertureIndex].rlist = rm
-            beamList[bestApertureIndex].KellyMeasure = kmeasure
-            # Precalculate the aperture map to save times.
-            data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+            for acounter in range(goodaperturesreceived):
+                lm = lmlist.pop(0)
+                rm = rmlist.pop(0)
+                bestApertureIndex = bestApertureIndexlist.pop(0)
+                kmeasure = kmeasurelist.pop(0)
+                # Update caligraphic C.
+                data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
+                data.notinC.removeIndex(bestApertureIndex)
+                # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
+                beamList[bestApertureIndex].llist = lm
+                beamList[bestApertureIndex].rlist = rm
+                beamList[bestApertureIndex].KellyMeasure = kmeasure
+                # Precalculate the aperture map to save times.
+                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
             data.rmpres = solveRMC(data.YU)
             print('I returned')
             ## List of apertures that was removed in this iteration
@@ -845,7 +867,7 @@ def column_generation(C):
                 if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
                     ## THIS PART IS DEACTIVATED RIGHT NOW BECAUSE ELIMINATIONPHASE = FALSE
                     if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase) & (not refinementloops):
-                       ## Maintain a tally of apertures that are being removed
+                        ## Maintain a tally of apertures that are being removed
                         entryCounter += 1
                         IndApRemovedThisStep.append(thisindex)
                         # Remove from caligraphicC and add to notinC
@@ -863,8 +885,6 @@ def column_generation(C):
                 printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             else:
                 printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE', C)
-            #Step 5 on Fei's paper. If necessary complete the treatment plan by identifying feasible apertures at control points c
-            #notinC and denote the final set of fluence rates by yk
     # Set up an order to go refining one by one.
     if refinementloops:
         intensepengList = []
