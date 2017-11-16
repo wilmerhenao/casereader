@@ -21,11 +21,12 @@ structureListRestricted = [6,      11,    13,   14,     15   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor
 threshold  =              [5,      25,      5,      43,     5   ]
-undercoeff =              [0.0,    0.0,   0.0,  0.000085,  0.0  ]
-overcoeff  =              [5E-5,10E-10, 10E-5,  10E-5,  10E-6]
+undercoeff =              [0.0,    0.0,   0.0,  0.0000085,  0.0  ]
+overcoeff  =              [5E-6,10E-11, 10E-6,  10E-6,  10E-7]
 fullcase = [9, 32, 13, 31, 29, 1, 11] # Files containing the 5 important structures
 testcase = [1]
 numcores = 8
+## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
@@ -71,11 +72,11 @@ class structure(object):
             structure.numTargets = structure.numTargets + 1
             self.threshold = 42
             self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 10.0
+            self.underdoseCoeff = 1000.0
         else:
             structure.numOARs += 1
-            self.threshold = 15.0
-            self.overdoseCoeff = 0.00001
+            self.threshold = 20.0
+            self.overdoseCoeff = 0.000001
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
@@ -107,7 +108,6 @@ class beam(object):
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
-
 
 class voxel(object):
     numVoxels = 0
@@ -627,6 +627,8 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
     p, l, r = PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw)
     return(p,l,r,thisApertureIndex)
 
+## The main difference between this pricing problem and the complete one is that this one analyses one aperture control
+## point only.
 def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth):
     pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth)
     # Calculate Kelly's aperture measure
@@ -641,6 +643,18 @@ def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth):
     Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
     Kellymeasure = Perimeter / Area
     return(pstar, l, r, bestApertureIndex, Kellymeasure)
+
+def chooseSmallest(listinorder, degreesapart):
+    # Choose the first one no matter what
+    chosenlist = [listinorder[0]]
+    for candidate in listinorder[1:]:
+        # Makes sure that the new entry is far enough from the already included
+        if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlist])) > degreesapart:
+            chosenlist.append(candidate)
+            degreesapart += 10
+            if degreesapart > 180:
+                break
+    return(chosenlist)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     print("Choosing one aperture amongst the ones that are available")
@@ -658,7 +672,11 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     pool.join()
 
     pvalues = np.array([result[0] for result in respool])
-    indstar = np.argmin(pvalues)
+    #indstar = np.argmin(pvalues)
+    listinorder = np.argsort(pvalues)
+    ## Choose entering candidates making sure that there are at least 10 degrees of separation
+    indstars = chooseSmallest(listinorder, 10)
+    indstar = listinorder[0]
     bestgroup = respool[indstar]
     pstar = bestgroup[0]
     l = bestgroup[1]
@@ -780,8 +798,8 @@ def column_generation(C):
     #eliminationThreshold = 0.1 Wilmer:This one worked really Well
     eliminationThreshold = 0.3
     ## Maximum leaf speed
-    vmax = 5 * 3.25 # 3.25 cms per second
-    data.speedlim = 0.83  # Values are in the VMATc paper page 2968. 0.85 < s < 6
+    vmax = 50 * 3.25 # 3.25 cms per second
+    data.speedlim = 0.85  # Values are in the VMATc paper page 2968. 0.85 < s < 6
     ## Maximum Dose Rate
     data.RU = 20.0
     ## Maximum intensity
@@ -797,7 +815,7 @@ def column_generation(C):
     pstar = -np.inf
     plotcounter = 0
     optimalvalues = []
-    while (pstar < 0) & (data.notinC.len() > 0):
+    while (data.notinC.len() > 0):
         # Step 1 on Fei's paper. Use the information on the current treatment plan to formulate and solve an instance of the PP
         data.calcDose()
         data.calcGradientandObjValue()
@@ -825,6 +843,7 @@ def column_generation(C):
             entryCounter = 0
             for thisindex in range(beam.numBeams):
                 if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
+                    ## THIS PART IS DEACTIVATED RIGHT NOW BECAUSE ELIMINATIONPHASE = FALSE
                     if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase) & (not refinementloops):
                        ## Maintain a tally of apertures that are being removed
                         entryCounter += 1
@@ -849,23 +868,24 @@ def column_generation(C):
     # Set up an order to go refining one by one.
     if refinementloops:
         intensepengList = []
-        for mynumbeam in range(0, beam.numBeams):
+        for mynumbeam in range(beam.numBeams):
             intensepengList.append(data.rmpres.x[mynumbeam])
         # pengList will contain a list of the different apertures in growing order of intensity
         pengList = sorted(range(beam.numBeams), key = lambda k: intensepengList[k])
         oldObjectiveValue = data.rmpres.fun
         refinementLoopCounter = 0
-        while refinementLoopCounter < 2:
+        while refinementLoopCounter < 10:
             refinementLoopCounter += 1
             for refaper in pengList:
+                print('rechecking aperture:', refaper)
                 data.calcDose()
                 data.calcGradientandObjValue()
                 data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
                 data.caligraphicC.removeIndex(refaper)
                 pstar, lm, rm, bestApertureIndex, kmeasure = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth)
-                # Update caligraphic C.
-                data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
-                data.notinC.removeIndex(bestApertureIndex)
+                # Update caligraphic C. why?
+                #data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
+                #data.notinC.removeIndex(bestApertureIndex)
                 if pstar >= 0:
                     continue #No aperture can make things better
                 # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
@@ -875,10 +895,11 @@ def column_generation(C):
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
                 data.rmpres = solveRMC(data.YU)
+            print("Let's see round of refinement", refinementLoopCounter)
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.001:
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.00001:
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
-                #break
+                break
             oldObjectiveValue = data.rmpres.fun
             plotcounter = plotcounter + beam.numBeams
         if eliminationPhase | refinementloops:
@@ -988,7 +1009,7 @@ del blist
 del dlist
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
 
-CValue = 0.001
+CValue = 0.000
 finalintensities = column_generation(CValue)
 averageNW = 0.0
 averageW = 0.0
