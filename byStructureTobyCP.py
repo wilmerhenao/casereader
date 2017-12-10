@@ -15,6 +15,7 @@ import math
 import pylab
 import matplotlib.pyplot as plt
 import pickle
+from collections import defaultdict
 
 # List of organs that will be used
 structureListRestricted = [6,      11,    13,   14,     15   ]
@@ -36,18 +37,17 @@ gc.enable()
 ## Find out the variables according to the hostname
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
-    datalocation = "/mnt/fastdata/Data/spine"
+    datalocation = "/mnt/fastdata/Data/spine360"
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
-    datalocation = "/home/wilmer/Dropbox/Data/spine/"
+    datalocation = "/home/wilmer/Dropbox/Data/spine360"
     dropbox = "/home/wilmer/Dropbox"
 elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/spine"
+    datalocation = "/scratch/engin_flux/wilmer/spine360"
     dropbox = "/home/wilmer/Dropbox"
 else:
-    datalocation = "/home/wilmer/Dropbox/Data/spine/" # MY LAPTOP
+    datalocation = "/home/wilmer/Dropbox/Data/spine360" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
-
 ## This class contains a structure (region)
 class structure(object):
     ## Static variable that keeps a tally of the total number of structures
@@ -201,51 +201,68 @@ def get_files_by_file_size(dirname, reverse=False):
         filepaths[i] = filepaths[i][0]
     return(filepaths)
 
-datafiles = get_files_by_file_size(datalocation)
+datafiles = [datalocation + "/by-Structure/PsVM1_180_92_2/67d05ef0-1447-4ae3-9b46-926fe2f1a8cd",
+             datalocation + "/by-Structure/PsVM2_90_2_2/850747bb-6c8e-4c1c-897e-8788bf4c2858",
+             datalocation + "/by-Structure/PsVM3_0_272_2/d592474d-dc94-4f8a-b8e5-a6a35f895393",
+             datalocation + "/by-Structure/PsVM4_270_182_2/472ae384-302f-41b5-b68f-d7c6990334a1"]
 
 # The first file will contain all the structure data, the rest will contain pointodoses.
 dpdata = dose_to_points_data_pb2.DoseToPointsData()
+numstructs = []
 
-# Start with reading structures, numvoxels and all that.
-f = open(datafiles.pop(0), "rb")
-dpdata.ParseFromString(f.read())
-f.close()
-datafiles.sort()
-#----------------------------------------------------------------------------------------
-# Get the data about the structures
-numstructs = len(dpdata.Structures)
-structureList = []
-structureDict = {}
-print("Reading in structures")
-for s in range(numstructs):
-    print('Reading:', dpdata.Structures[s].Id)
-    structureList.append(structure(dpdata.Structures[s]))
-    structureDict[structureList[s].Id] = s
-    print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
-print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
-      '\nNumber of OARs', structure.numOARs)
-# Manual modifications of targets
-if not debugmode:
-    print('modifying penalization function according to the 5 structure case')
-    strcounter = 0
-    for s in structureListRestricted:
-        structureList[s].underdoseCoeff = undercoeff[strcounter]
-        structureList[s].overdoseCoeff = overcoeff[strcounter]
-        structureList[s].threshold = threshold[strcounter]
-        strcounter += 1
-#----------------------------------------------------------------------------------------
-## Get the data about beamlets
-numbeamlets = len(dpdata.Beamlets)
-beamletList = []
-print('Reading in beamlet data:')
-for blt in range(numbeamlets):
-    a = beamlet(dpdata.Beamlets[blt])
-    beamletList.append(a)
-    #print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
-print('total number of beamlets read:', beamlet.numBeamlets)
-#----------------------------------------------------------------------------------------
-# Get the data about beams
+structuresbysection = []
+structureDictbySection = []
+endOfStructures = []
+beginningOfStructures = []
+allbeamlets = []
+beamletDict = defaultdict(list)
+for thisfile in datafiles:
+    print('reading file ' + thisfile)
+    # Start with reading structures, numvoxels and all that.
+    f = open(thisfile, "rb")
+    dpdata.ParseFromString(f.read())
+    f.close()
+    datafiles.sort()
+    #----------------------------------------------------------------------------------------
+    # Get the data about the structures
+    numstructs.append(len(dpdata.Structures))
+    structureList = []
+    structureDict = {}
+    beginnings = []
+    endings = []
+    print("Reading in structures")
+    for s in range(len(dpdata.Structures)):
+        print('Reading:', dpdata.Structures[s].Id)
+        structureList.append(structure(dpdata.Structures[s]))
+        structureDict[structureList[s].Id] = s
+        print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ',
+              structureList[s].EndPointIndex)
+        beginnings.append(structureList[s].StartPointIndex)
+        endings.append(structureList[s].EndPointIndex)
+    print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
+          '\nNumber of OARs', structure.numOARs)
+    structuresbysection.append(structureList)
+    structureDictbySection.append(structureDict)
+    #----------------------------------------------------------------------------------------
+    ## Get the data about beamlets
+    numbeamlets = len(dpdata.Beamlets)
+    allbeamlets.append(numbeamlets)
+    beamletList = []
+    print('Reading in beamlet data:')
+    for blt in range(numbeamlets):
+        a = beamlet(dpdata.Beamlets[blt])
+        beamletList.append(a)
+        print(a)
+        beamletDict[str(a.XStart) + "_" + str(a.YStart)].append(a.Index)
+    print('total number of beamlets read:', beamlet.numBeamlets)
+print(beamletDict)
+[print(item) for item in beamletDict]
+[print(item) for item in structureDictbySection]
+print('is the number of beamlets the same? ', allbeamlets)
+    #----------------------------------------------------------------------------------------
+    # Get the data about beams
 numbeams = len(dpdata.Beams)
+allbeamlets.append(numbeams)
 beamList = []
 print('Reading in Beam Data:')
 for b in range(numbeams):
@@ -268,6 +285,8 @@ print('total number of voxels read:', voxel.numVoxels)
 ## Free the memory
 dpdata = None
 gc.collect()
+## Let's check the results
+
 #----------------------------------------------------------------------------------------
 ## Get the point to dose data in a sparse matrix
 start = time.time()
