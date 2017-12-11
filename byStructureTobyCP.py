@@ -97,6 +97,7 @@ class beam(object):
         self.JawX2 = sthing.JawX2
         self.JawY1 = sthing.JawY1
         self.JawY2 = sthing.JawY2
+        self.Id = sthing.Id
         # Update local variables
         self.StartBeamletIndex = sthing.StartBeamletIndex
         self.EndBeamletIndex = sthing.EndBeamletIndex
@@ -255,34 +256,38 @@ for thisfile in datafiles:
         print(a)
         beamletDict[str(a.XStart) + "_" + str(a.YStart)].append(a.Index)
     print('total number of beamlets read:', beamlet.numBeamlets)
+    numbeams = len(dpdata.Beams)
+    allbeamlets.append(numbeams)
+    beamList = []
+    print('Reading in Beam Data:')
+    for b in range(numbeams):
+        a = beam(dpdata.Beams[b])
+        beamList.append(a)
+        for blt in range(dpdata.Beams[b].StartBeamletIndex, dpdata.Beams[b].EndBeamletIndex):
+            beamletList[blt].belongsToBeam = b
+            # print(beamList[b].JawX1, beamList[b].JawX2, beamList[b].JawY1, beamList[b].JawY2)
+    print('There are a total of beams:', beam.numBeams)
+    print('beamlet data was updated so they point to their owner')
+    ## Get data about voxels.
+    numvoxels = len(dpdata.Points)
+    voxelList = []
+    print('Reading in Voxel data:')
+    for v in range(numvoxels):
+        a = voxel(dpdata.Points[v])
+        voxelList.append(a)
+    print('total number of voxels read:', voxel.numVoxels)
+    ## Free the memory
 print(beamletDict)
 [print(item) for item in beamletDict]
 [print(item) for item in structureDictbySection]
 print('is the number of beamlets the same? ', allbeamlets)
     #----------------------------------------------------------------------------------------
     # Get the data about beams
-numbeams = len(dpdata.Beams)
-allbeamlets.append(numbeams)
-beamList = []
-print('Reading in Beam Data:')
-for b in range(numbeams):
-    beamList.append(beam(dpdata.Beams[b]))
-    for blt in range(dpdata.Beams[b].StartBeamletIndex, dpdata.Beams[b].EndBeamletIndex):
-        beamletList[blt].belongsToBeam = b
-    #print(beamList[b].JawX1, beamList[b].JawX2, beamList[b].JawY1, beamList[b].JawY2)
-print('There are a total of beams:', beam.numBeams)
-print('beamlet data was updated so they point to their owner')
+
 #for b in range(numbeams):
 #    print(beamList[b].angle)
 #----------------------------------------------------------------------------------------
-## Get data about voxels.
-numvoxels = len(dpdata.Points)
-voxelList = []
-print('Reading in Voxel data:')
-for v in range(numvoxels):
-    voxelList.append(voxel(dpdata.Points[v]))
-print('total number of voxels read:', voxel.numVoxels)
-## Free the memory
+
 dpdata = None
 gc.collect()
 ## Let's check the results
