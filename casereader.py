@@ -28,7 +28,7 @@ testcase = [1]
 numcores = 8
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
-easyread = True
+easyread = False
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 

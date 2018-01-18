@@ -14,15 +14,15 @@ message Beam {
 message Beamlet {
    int32 Index = 1;
    string BeamId = 2;
-   double XSize = 3;
-   double YSize = 4;
-   double XStart = 5;
-   double YStart = 6;
+   float XSize = 3;
+   float YSize = 4;
+   float XStart = 5;
+   float YStart = 6;
 }
 
 message BeamletDose {
    int32 Index = 1;
-   double Dose = 2;
+   float Dose = 2;
 }
 
 message DoseToPointsData {
@@ -37,9 +37,9 @@ message DoseToPointsData {
 message Point {
    int32 Index = 1;
    string StructureId = 2;
-   double X = 3;
-   double Y = 4;
-   double Z = 5;
+   float X = 3;
+   float Y = 4;
+   float Z = 5;
 }
 
 message PointDose {
