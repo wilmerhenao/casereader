@@ -17,15 +17,15 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-structureListRestricted = [6,      11,    13,   14,     15   ]
+structureListRestricted = [4,      8,    1,   7,     0   ]
 #limits                    27,     30,    24,   36-47,  22
-#names                     esof,   trach, prv2, tumor
+#names                     esof,   trach, prv2, tumor, chord
 threshold  =              [5,      25,      5,      43,     5   ]
 undercoeff =              [0.0,    0.0,   0.0,  0.0000085,  0.0  ]
 overcoeff  =              [5E-6,10E-11, 10E-6,  10E-6,  10E-7]
-fullcase = [9, 32, 13, 31, 29, 1, 11] # Files containing the 5 important structures
-testcase = [1]
 numcores = 8
+testcase = [0]
+fullcase = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
 easyread = False
@@ -36,16 +36,16 @@ gc.enable()
 ## Find out the variables according to the hostname
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
-    datalocation = "/mnt/fastdata/Data/spine"
+    datalocation = "/mnt/fastdata/Data/spine360/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
-    datalocation = "/home/wilmer/Dropbox/Data/spine/"
+    datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
 elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/spine"
+    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
 else:
-    datalocation = "/home/wilmer/Dropbox/Data/spine/" # MY LAPTOP
+    datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
 
 ## This class contains a structure (region)
@@ -75,7 +75,7 @@ class structure(object):
             self.underdoseCoeff = 1000.0
         else:
             structure.numOARs += 1
-            self.threshold = 20.0
+            self.threshold = 0.0
             self.overdoseCoeff = 0.000001
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
@@ -83,14 +83,14 @@ class structure(object):
 class beam(object):
     numBeams = 0
     M = 8
-    N = 70
+    N = 14
     JawX1 = None
     JawX2 = None
     JawY1 = None
     JawY2 = None
     def __init__(self, sthing):
         # Update the static counter and other variables
-        self.angle = 10 * beam.numBeams # Notice that this one changes per beam
+        self.angle = 2 * beam.numBeams # Notice that this one changes per beam
         self.location = beam.numBeams
         beam.numBeams += 1
         self.JawX1 = sthing.JawX1
@@ -104,7 +104,7 @@ class beam(object):
         self.beamletsInBeam = self.beamletsPerBeam
         # Initialize left and right leaf limits for all
         self.leftEdge = -1
-        self.rightEdge = 70
+        self.rightEdge = 14
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
@@ -126,14 +126,14 @@ class beamlet(object):
     def __init__(self, sthing):
         beamlet.numBeamlets += 1
         self.Index = sthing.Index
-        self.XStart = sthing.XStart + 35 # Make everything start at zero
+        self.XStart = sthing.XStart + 7 # Make everything start at zero
         self.YStart = sthing.YStart
         beamlet.XSize = sthing.XSize
         beamlet.YSize = sthing.YSize
         self.belongsToBeam = None
 
 ## apertureList is a class definition of locs and angles that is always sorted.
-# Its attributes are loc which is the numeric location; It has range 0 to 36 for
+# Its attributes are loc which is the numeric location; It has range 0 to 180 for
 # the spine case; Angle is the numeric angle in degrees; It ranges from 0 to 360 degrees
 # apertureList should be sorted in ascending order everytime you add a new element; User CAN make this safe assumption
 class apertureList:
@@ -252,11 +252,8 @@ for b in range(numbeams):
     beamList.append(beam(dpdata.Beams[b]))
     for blt in range(dpdata.Beams[b].StartBeamletIndex, dpdata.Beams[b].EndBeamletIndex):
         beamletList[blt].belongsToBeam = b
-    #print(beamList[b].JawX1, beamList[b].JawX2, beamList[b].JawY1, beamList[b].JawY2)
 print('There are a total of beams:', beam.numBeams)
 print('beamlet data was updated so they point to their owner')
-#for b in range(numbeams):
-#    print(beamList[b].angle)
 #----------------------------------------------------------------------------------------
 ## Get data about voxels.
 numvoxels = len(dpdata.Points)
@@ -308,12 +305,9 @@ def getDmatrixPieces():
         for fl in [datafiles[x] for x in thiscase]:
             counter+=1
             print('reading datafile:', counter,fl)
-            dpdata = dose_to_points_data_pb2.DoseToPointsData()
-
-            f = open(fl, "rb")
-            dpdata.ParseFromString(f.read())
-            f.close()
-
+            input = open(fl, 'rb')
+            tempdvar = pickle.load(input)
+            input.close()
             for dp in dpdata.PointDoses:
                 numbeamletDoses = len(dp.BeamletDoses)
                 vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
