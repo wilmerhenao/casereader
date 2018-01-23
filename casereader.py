@@ -24,10 +24,10 @@ threshold  =              [5,      25,      5,      43,     5   ]
 undercoeff =              [0.0,    0.0,   0.0,  0.0000085,  0.0  ]
 overcoeff  =              [5E-6,10E-11, 10E-6,  10E-6,  10E-7]
 numcores = 8
-testcase = [0]
+testcase = [i for i in range(0, 180, 18)]
 fullcase = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = False
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -181,7 +181,7 @@ class apertureList:
         else:
             return(False)
 
-def get_files_by_file_size(dirname, reverse=False):
+def get_files_by_file_size(dirname, reverse = False):
     """ Return list of file paths in directory sorted by file size """
     # Get list of files
     filepaths = []
@@ -287,9 +287,9 @@ def getDmatrixPieces():
 
     else:
         ## Initialize vectors for voxel component, beamlet component and dose
-        vcps = []
-        bcps = []
-        dcps = []
+        newvcps = []
+        newbcps = []
+        newdcps = []
 
         counter = 0
         thiscase = fullcase
@@ -303,30 +303,33 @@ def getDmatrixPieces():
 
         ## Read the beams now.
         for fl in [datafiles[x] for x in thiscase]:
+            print(fl)
             counter+=1
             print('reading datafile:', counter,fl)
             input = open(fl, 'rb')
-            tempdvar = pickle.load(input)
+            indices, doses = pickle.load(input)
             input.close()
-            for dp in dpdata.PointDoses:
-                numbeamletDoses = len(dp.BeamletDoses)
-                vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
-                bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
-                dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
+            for k in indices.keys():
+                for m in myranges:
+                    if k in m:
+                        newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
+                        newbcps += indices[k]
+                        newdcps += doses[k]
             gc.collect()
-            #print('structure and first voxel', counter-1, dpdata.PointDoses[0].Index)
+            del indices
+            del doses
+            del input
 
         print('case cleanup')
-        newbcps = []
-        newvcps = []
-        newdcps = []
-        start = time.time()
-        for i in range(len(vcps)):
-            for m in myranges:
-                if vcps[i] in m:
-                    newbcps.append(bcps[i])
-                    newvcps.append(vcps[i])
-                    newdcps.append(dcps[i])
+        #newbcps = []
+        #newvcps = []
+        #newdcps = []
+        #for i in range(len(vcps)):
+        #    for m in myranges:
+        #        if vcps[i] in m:
+        #            newbcps.append(bcps[i])
+        #            newvcps.append(vcps[i])
+        #            newdcps.append(dcps[i])
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
@@ -513,7 +516,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = weight
             # dadnetwork and mnetwork don't need to be changed here for obvious reasons
     posBeginningOfRow += nodesinpreviouslevel
-    leftmostleaf = 70 - 1 # Position in python position(-1) of the leftmost leaf
+    leftmostleaf = 14 - 1 # Position in python position(-1) of the leftmost leaf
     # Then handle the calculations for the m rows. Nodes that are neither source nor sink.
     for m in range(1,M):
         oldflag = nodesinpreviouslevel
@@ -559,7 +562,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
         posBeginningOfRow = nodesinpreviouslevel + posBeginningOfRow # This is the total number of network nodes
         # Keep the location of the leftmost leaf
-        leftmostleaf = 70 + leftmostleaf
+        leftmostleaf = 14 + leftmostleaf
     # thisnode gets augmented only 1 because only the sink node will be added
     thisnode += 1
     for mynode in (range(posBeginningOfRow - nodesinpreviouslevel, posBeginningOfRow )): # +1 because otherwise it could be empty
@@ -678,9 +681,9 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     pvalues = np.array([result[0] for result in respool])
     # Order according to pvalues
     respoolinorder = np.argsort(pvalues)
-    listinorder = [respool[i][3] for i in respoolinorder]
+    #listinorder = [respool[i][3] for i in respoolinorder]
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
-    indstars = chooseSmallest(listinorder, 10)
+    indstars = chooseSmallest([i for i in range(len(respool))], 10) #This 10 is the degrees of separation
     # Initialize the lists that I'm going to return
     pstarlist = []
     llist = []
@@ -831,10 +834,13 @@ def column_generation(C):
     #Step 0 on Fei's paper. Set C = empty and zbar = 0. The gradient of numbeams dimensions generated here will not
     # be used, and therefore is nothing to worry about.
     # At the beginning no apertures are selected, and those who are not selected are all in notinC
-    for j in range(beam.numBeams):
-        data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
+    if debugmode:
+        for j in testcase:
+            data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
+    else:
+        for j in range(beam.numBeams):
+            data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
 
-    pstar = -np.inf
     plotcounter = 0
     optimalvalues = []
     while (data.notinC.len() > 0):

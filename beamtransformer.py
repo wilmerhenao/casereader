@@ -1,11 +1,10 @@
 import pickle
 from collections import defaultdict
+import sys
 
 myfolder = '/mnt/datadrive/Dropbox/Data/spine360/by-Beam/'
 #myfolder = '/home/wilmer/Dropbox/Data/spine360/by-Beam/'
 #data = pickle.load( open( myfolder + "358.pickle", "rb" ) )
-
-
 
 class beamletdose:
     def __init__(self, a):
@@ -28,12 +27,15 @@ for mynum in range(0,359,2):
     dd = defaultdict(list) #doses
     for itemlist in items:
         for dp in itemlist:
-            di[dp[0]].append(dp[1].Index)
-            dd[dp[0]].append(dp[1].Dose)
+            if dp[1].Dose > 0:
+                di[dp[0]].append(dp[1].Index)
+                dd[dp[0]].append(dp[1].Dose)
     output = open(myfolder + 'twolists' + str(mynum) + '.pickle', 'ab')
     pickle.dump([di,dd], output)
     output.close()
     d = None
+
+sys.exit()
 
 for mynum in range(0,359,2):
     PIK = myfolder + str(mynum) + ".pickle"
