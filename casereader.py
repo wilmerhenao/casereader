@@ -171,6 +171,10 @@ class apertureList:
     def __call__(self, index):
         toreturn = [i for i,x in enumerate(self.loc) if x == index]
         return(self.angle[toreturn[0]])
+    ## Overload the bracket operator to achieve the index from the angle
+    def __getitem__(self, tangl):
+        toreturn = [i for i,x in enumerate(self.angle) if x == tangl]
+        return(self.angle[toreturn[0]])
     ## Returns the length of this instantiation without the need to pass parameters.
     def len(self):
         return(len(self.loc))
@@ -685,8 +689,6 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
         r = bestgroup[2]
         bestApertureIndex = bestgroup[3]
         # Change the leaf positions for this particular beam
-        # beamList[bestApertureIndex].llist = l # This shouldn't be here. It should only be done after checking for pstar > 0
-        # beamList[bestApertureIndex].rlist = r
         print("One of the best apertures was: ", bestApertureIndex)
         # Calculate Kelly's aperture measure
         Area = 0.0
