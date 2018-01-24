@@ -27,7 +27,7 @@ numcores = 8
 testcase = [i for i in range(0, 180, 18)]
 fullcase = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -632,10 +632,10 @@ def chooseSmallest(locallocation, listinorder, degreesapart):
     for i in range(1, len(listinorder)):
         candidate = listinorder[i]
         # Makes sure that the new entry is far enough from the already included
-        if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlocs])) > degreesapart:
+        if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlocs + data.caligraphicC.loc])) > degreesapart:
             chosenlocs.append(candidate)
             lllist.append(locallocation[i])
-            degreesapart += 10
+            degreesapart *= 2
             if degreesapart > 180:
                 break
     return(lllist)
@@ -660,8 +660,10 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     # Order according to pvalues
     respoolinorder = np.argsort(pvalues)
     listinorder = [respool[i][3] for i in respoolinorder]
+    # Choose only pvalues that are negative to be selected to enter
+    negpvalues = max(1, sum([1 for i in pvalues if i < 0]))
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
-    indstars = chooseSmallest(respoolinorder, listinorder, 10) #This 10 is the degrees of separation
+    indstars = chooseSmallest(respoolinorder[:negpvalues], listinorder[:negpvalues], 10) #This 10 is the degrees of separation
     # Initialize the lists that I'm going to return
     pstarlist = []
     llist = []
