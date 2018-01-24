@@ -28,7 +28,7 @@ testcase = [i for i in range(0, 180, 18)]
 fullcase = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = True
-easyread = False
+easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 
@@ -215,7 +215,7 @@ datafiles.sort()
 # Get the data about the structures
 numstructs = len(dpdata.Structures)
 structureList = []
-structureDict = {}
+structureDict = {} # keys are the names of the structure and the value is the corresponding index location (integer)
 print("Reading in structures")
 for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
@@ -225,14 +225,14 @@ for s in range(numstructs):
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 # Manual modifications of targets
-if not debugmode:
-    print('modifying penalization function according to the 5 structure case')
-    strcounter = 0
-    for s in structureListRestricted:
-        structureList[s].underdoseCoeff = undercoeff[strcounter]
-        structureList[s].overdoseCoeff = overcoeff[strcounter]
-        structureList[s].threshold = threshold[strcounter]
-        strcounter += 1
+print('modifying penalization function according to the 5 structure case')
+strcounter = 0
+# Assign the values for the penalization function F(z)
+for s in structureListRestricted:
+    structureList[s].underdoseCoeff = undercoeff[strcounter]
+    structureList[s].overdoseCoeff = overcoeff[strcounter]
+    structureList[s].threshold = threshold[strcounter]
+    strcounter += 1
 #----------------------------------------------------------------------------------------
 ## Get the data about beamlets
 numbeamlets = len(dpdata.Beamlets)
@@ -291,7 +291,6 @@ def getDmatrixPieces():
         newbcps = []
         newdcps = []
 
-        counter = 0
         thiscase = fullcase
         if debugmode:
             thiscase = testcase
@@ -302,9 +301,10 @@ def getDmatrixPieces():
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
 
         ## Read the beams now.
+        counter = 0
         for fl in [datafiles[x] for x in thiscase]:
             print(fl)
-            counter+=1
+            counter += 1
             print('reading datafile:', counter,fl)
             input = open(fl, 'rb')
             indices, doses = pickle.load(input)
@@ -320,16 +320,6 @@ def getDmatrixPieces():
             del doses
             del input
 
-        print('case cleanup')
-        #newbcps = []
-        #newvcps = []
-        #newdcps = []
-        #for i in range(len(vcps)):
-        #    for m in myranges:
-        #        if vcps[i] in m:
-        #            newbcps.append(bcps[i])
-        #            newvcps.append(vcps[i])
-        #            newdcps.append(dcps[i])
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
@@ -637,30 +627,23 @@ def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth):
     Kellymeasure = Perimeter / Area
     return(pstar, l, r, bestApertureIndex, Kellymeasure)
 
-def chooseSmallest(listinorder, degreesapart):
+def chooseSmallest(respoolinorder, listinorder, degreesapart):
     # Choose the first one no matter what
+    chosenrespool = [respoolinorder[0]]
     chosenlist = [listinorder[0]]
-    for candidate in listinorder[1:]:
+    for i in range(1, len(respoolinorder)):
+        candidate = listinorder[i]
+        respooldate = respoolinorder[i]
         # Makes sure that the new entry is far enough from the already included
-        print('debugging:')
-        print('listinorder', listinorder)
-        print('notin', data.notinC)
-        print('candidate', candidate)
-        print('candidatenotinc', data.notinC(candidate))
-        print('chosenlist', chosenlist)
         for apsin in chosenlist:
-            print('thisapsin', apsin)
             data.notinC(apsin)
-        print('entre')
-        print('el problema estara aca:')
-        print(min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlist])))
         if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlist])) > degreesapart:
-            print('salga')
+            chosenrespool.append(respooldate)
             chosenlist.append(candidate)
             degreesapart += 10
             if degreesapart > 180:
                 break
-    return(chosenlist)
+    return(chosenrespool)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     print("Choosing one aperture amongst the ones that are available")
@@ -681,9 +664,9 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     pvalues = np.array([result[0] for result in respool])
     # Order according to pvalues
     respoolinorder = np.argsort(pvalues)
-    #listinorder = [respool[i][3] for i in respoolinorder]
+    listinorder = [respool[i][3] for i in respoolinorder]
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
-    indstars = chooseSmallest([i for i in range(len(respool))], 10) #This 10 is the degrees of separation
+    indstars = chooseSmallest(respoolinorder, listinorder, 10) #This 10 is the degrees of separation
     # Initialize the lists that I'm going to return
     pstarlist = []
     llist = []
@@ -835,11 +818,11 @@ def column_generation(C):
     # be used, and therefore is nothing to worry about.
     # At the beginning no apertures are selected, and those who are not selected are all in notinC
     if debugmode:
-        for j in testcase:
-            data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
+        rangenumbeams = testcase
     else:
-        for j in range(beam.numBeams):
-            data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
+        rangenumbeams = range(beam.numBeams)
+    for j in rangenumbeams:
+        data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
 
     plotcounter = 0
     optimalvalues = []
@@ -874,7 +857,7 @@ def column_generation(C):
             ## List of apertures that was removed in this iteration
             IndApRemovedThisStep = []
             entryCounter = 0
-            for thisindex in range(beam.numBeams):
+            for thisindex in rangenumbeams:
                 if thisindex in data.caligraphicC.loc: #Only activate what is an aperture
                     ## THIS PART IS DEACTIVATED RIGHT NOW BECAUSE ELIMINATIONPHASE = FALSE
                     if (data.rmpres.x[thisindex] < eliminationThreshold) & (eliminationPhase) & (not refinementloops):
@@ -899,10 +882,10 @@ def column_generation(C):
     # Set up an order to go refining one by one.
     if refinementloops:
         intensepengList = []
-        for mynumbeam in range(beam.numBeams):
+        for mynumbeam in rangenumbeams:
             intensepengList.append(data.rmpres.x[mynumbeam])
         # pengList will contain a list of the different apertures in growing order of intensity
-        pengList = sorted(range(beam.numBeams), key = lambda k: intensepengList[k])
+        pengList = [x for _,x in sorted(zip(intensepengList, rangenumbeams), key = lambda pair: pair[0])]
         oldObjectiveValue = data.rmpres.fun
         refinementLoopCounter = 0
         while refinementLoopCounter < 10:
@@ -1028,7 +1011,6 @@ for v in data.voxelsUsed:
     strsIdxUsd.add(structureDict[voxelList[v].StructureId])
 data.structuresUsed = list(strsUsd)
 data.structureIndexUsed = list(strsIdxUsd)
-print('voxels used:', data.voxelsUsed)
 print('structures used in no particular order:', data.structureIndexUsed)
 structureNames = []
 for s in data.structureIndexUsed:
