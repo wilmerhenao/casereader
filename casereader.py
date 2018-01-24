@@ -632,12 +632,14 @@ def chooseSmallest(locallocation, listinorder, degreesapart):
     for i in range(1, len(listinorder)):
         candidate = listinorder[i]
         # Makes sure that the new entry is far enough from the already included
-        if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlocs + data.caligraphicC.loc])) > degreesapart:
-            chosenlocs.append(candidate)
-            lllist.append(locallocation[i])
-            degreesapart *= 2
-            if degreesapart > 180:
-                break
+        if min(np.absolute([min(abs(data.notinC(candidate) - data.notinC(apsin)), abs(360 - abs(data.notinC(candidate) - data.notinC(apsin)))) for apsin in chosenlocs])) > degreesapart:
+            if not data.caligraphicC.isEmpty():
+                if min(np.absolute([min(abs(data.notinC(candidate) - data.caligraphicC(apsin)), abs(360 - abs(data.notinC(candidate) - data.caligraphicC(apsin)))) for apsin in data.caligraphicC.loc])) > degreesapart:
+                    chosenlocs.append(candidate)
+                    lllist.append(locallocation[i])
+                    degreesapart *= 2
+                if degreesapart > 180:
+                    return(lllist)
     return(lllist)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw):
@@ -871,9 +873,9 @@ def column_generation(C):
             optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
             if eliminationPhase | refinementloops:
-                printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             else:
-                printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE', C)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE', C)
         print('caligraphicC:', data.caligraphicC.angle)
         print('notinC: ', data.notinC.angle)
     # Set up an order to go refining one by one.
