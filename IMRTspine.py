@@ -17,32 +17,33 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-structureListRestricted = [6,      11,    13,   14,     15   ]
+structureListRestricted = [4,      8,    1,   7,     0   ]
+#structureListRestricted = [6,      11,    13,   14,     15   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor
 threshold  =              [0,      0,      0,      41,     0   ]
 undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
-overcoeff  =              [10E-6,10E-9, 10E-6,  10E-5,  10E-6]
-fullcase = [9, 32, 13, 31, 29, 1, 11]
-testcase = [1]
+overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6]
 numcores = 8
+testcase = [i for i in range(0, 180, 18)]
+fullcase = [i for i in range(180)]
 debugmode = False
-easyread = True
+easyread = False
 
 gc.enable()
 ## Find out the variables according to the hostname
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
-    datalocation = "/mnt/fastdata/Data/spine"
+    datalocation = "/mnt/fastdata/Data/spine360/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
-    datalocation = "/home/wilmer/Dropbox/Data/spine/"
+    datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
 elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/spine"
+    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
 else:
-    datalocation = "/home/wilmer/Dropbox/Data/spine/" # MY LAPTOP
+    datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
 
 ## This class contains a structure (region)
@@ -80,7 +81,7 @@ class structure(object):
 class beam(object):
     numBeams = 0
     M = 8
-    N = 70
+    N = 14
     JawX1 = None
     JawX2 = None
     JawY1 = None
@@ -99,9 +100,9 @@ class beam(object):
         self.EndBeamletIndex = sthing.EndBeamletIndex
         self.beamletsPerBeam = self.EndBeamletIndex - self.StartBeamletIndex
         self.beamletsInBeam = self.beamletsPerBeam
-        # Initialize left and right leaf limits for all
+        # Initialize left and right leaf limittotal times for all
         self.leftEdge = -1
-        self.rightEdge = 70
+        self.rightEdge = 14
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
 
@@ -123,7 +124,7 @@ class beamlet(object):
     def __init__(self, sthing):
         beamlet.numBeamlets += 1
         self.Index = sthing.Index
-        self.XStart = sthing.XStart + 35 # Make everything start at zero
+        self.XStart = sthing.XStart + 7 # Make everything start at zero
         self.YStart = sthing.YStart
         beamlet.XSize = sthing.XSize
         beamlet.YSize = sthing.YSize
@@ -197,14 +198,16 @@ def get_files_by_file_size(dirname, reverse=False):
     for i in range(len(filepaths)):
         filepaths[i] = filepaths[i][0]
     return(filepaths)
-
+print(datalocation)
 datafiles = get_files_by_file_size(datalocation)
 
 # The first file will contain all the structure data, the rest will contain pointodoses.
 dpdata = dose_to_points_data_pb2.DoseToPointsData()
 
 # Start with reading structures, numvoxels and all that.
-f = open(datafiles.pop(0), "rb")
+stfile = datafiles.pop(0)
+print('structure file: ', stfile)
+f = open(stfile, "rb")
 dpdata.ParseFromString(f.read())
 f.close()
 datafiles.sort()
@@ -268,8 +271,9 @@ gc.collect()
 ## Get the point to dose data in a sparse matrix
 start = time.time()
 
+#----------------------------------------------------------------------------------------
+## Get the point to dose data in a sparse matrix
 def getDmatrixPieces():
-
     if easyread:
         print('doing an easyread')
         if debugmode:
@@ -283,14 +287,12 @@ def getDmatrixPieces():
         newbcps = datasave[0]
         newvcps = datasave[1]
         newdcps = datasave[2]
-
     else:
         ## Initialize vectors for voxel component, beamlet component and dose
-        vcps = []
-        bcps = []
-        dcps = []
+        newvcps = []
+        newbcps = []
+        newdcps = []
 
-        counter = 0
         thiscase = fullcase
         if debugmode:
             thiscase = testcase
@@ -299,36 +301,25 @@ def getDmatrixPieces():
         myranges = []
         for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
-
         ## Read the beams now.
+        counter = 0
         for fl in [datafiles[x] for x in thiscase]:
-            counter+=1
+            print(fl)
+            counter += 1
             print('reading datafile:', counter,fl)
-            dpdata = dose_to_points_data_pb2.DoseToPointsData()
-
-            f = open(fl, "rb")
-            dpdata.ParseFromString(f.read())
-            f.close()
-
-            for dp in dpdata.PointDoses:
-                numbeamletDoses = len(dp.BeamletDoses)
-                vcps += [dp.Index] * numbeamletDoses # This is the voxel we're dealing with
-                bcps += list(map(lambda val: val.Index, dp.BeamletDoses))
-                dcps += list(map(lambda val: val.Dose, dp.BeamletDoses))
+            input = open(fl, 'rb')
+            indices, doses = pickle.load(input)
+            input.close()
+            for k in indices.keys():
+                for m in myranges:
+                    if k in m:
+                        newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
+                        newbcps += indices[k]
+                        newdcps += doses[k]
             gc.collect()
-            #print('structure and first voxel', counter-1, dpdata.PointDoses[0].Index)
-
-        print('case cleanup')
-        newbcps = []
-        newvcps = []
-        newdcps = []
-        start = time.time()
-        for i in range(len(vcps)):
-            for m in myranges:
-                if vcps[i] in m:
-                    newbcps.append(bcps[i])
-                    newvcps.append(vcps[i])
-                    newdcps.append(dcps[i])
+            del indices
+            del doses
+            del input
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
@@ -338,7 +329,6 @@ def getDmatrixPieces():
         with open(PIK, "wb") as f:
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
         f.close()
-
     return(newvcps, newbcps, newdcps)
 
 print('total time reading dose to points:', time.time() - start)
@@ -430,6 +420,7 @@ def printresults(myfolder):
     plt.close()
 
 vlist, blist, dlist = getDmatrixPieces()
+print('max of dlist:', max(dlist))
 data = problemData()
 data.voxelsUsed = np.unique(vlist)
 strsUsd = set([])
@@ -451,10 +442,15 @@ del blist
 del dlist
 CValue = 1.0
 # find initial location
-data.currentIntensities = np.zeros(beamlet.numBeamlets)
+data.currentIntensities = np.zeros(beamlet.numBeamlets) + 1.0
 data.calcDose(data.currentIntensities)
 before  = time.time()
-data.res = minimize(calcObjGrad, data.currentIntensities,method='L-BFGS-B', jac = True, bounds=[(0, None) for i in range(0, len(data.currentIntensities))], options={'ftol':1e-5,'disp':5})
+data.res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds=[(0, None) for i in range(0, len(data.currentIntensities))], options={'ftol':1e-6,'disp':5})
+PIK = dropbox + '/Research/VMAT/casereader/datares.pickle'
+print(PIK)
+with open(PIK, "wb") as f:
+    pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+f.close()
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
 after = time.time()
 print('The whole program took: '  + str(time.time() - start) + ' seconds to finish')

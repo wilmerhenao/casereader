@@ -20,14 +20,14 @@ import pickle
 structureListRestricted = [4,      8,    1,   7,     0   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor, chord
-threshold  =              [5,      25,      5,      43,     5   ]
-undercoeff =              [0.0,    0.0,   0.0,  0.0000085,  0.0  ]
-overcoeff  =              [5E-6,10E-11, 10E-6,  10E-6,  10E-7]
-numcores = 8
-testcase = [i for i in range(0, 180, 18)]
-fullcase = [i for i in range(180)]
+threshold  =              [0,      0,      0,      41,     0   ]
+undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
+overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6]
+numcores   = 8
+testcase   = [i for i in range(0, 180, 18)]
+fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = True
+debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -272,7 +272,6 @@ gc.collect()
 #----------------------------------------------------------------------------------------
 ## Get the point to dose data in a sparse matrix
 def getDmatrixPieces():
-
     if easyread:
         print('doing an easyread')
         if debugmode:
@@ -286,7 +285,6 @@ def getDmatrixPieces():
         newbcps = datasave[0]
         newvcps = datasave[1]
         newdcps = datasave[2]
-
     else:
         ## Initialize vectors for voxel component, beamlet component and dose
         newvcps = []
@@ -301,7 +299,6 @@ def getDmatrixPieces():
         myranges = []
         for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
-
         ## Read the beams now.
         counter = 0
         for fl in [datafiles[x] for x in thiscase]:
@@ -321,7 +318,6 @@ def getDmatrixPieces():
             del indices
             del doses
             del input
-
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
@@ -332,7 +328,6 @@ def getDmatrixPieces():
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
         f.close()
     return(newvcps, newbcps, newdcps)
-
 #------------------------------------------------------------------------------------------------------------------
 
 class problemData():
@@ -716,8 +711,7 @@ def updateOpenAperture(i):
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
     openapertureStrength = []
-    D = DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex, ]
-    diagmaker = np.zeros(D.shape[0], dtype = float)
+    diagmaker = np.zeros(DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex, ].shape[0], dtype = float)
     for m in range(0, len(beamList[i].llist)):
         # Find geographical values of llist and rlist.
         # Find geographical location of the first row.
@@ -796,6 +790,45 @@ def solveRMC(YU):
 
     print('Restricted Master Problem solved in ' + str(time.time() - start) + ' seconds')
     return(res)
+
+def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth):
+    print('rechecking aperture:', refaper)
+    # Remove aperture from the set temporarily
+    # Check if it's in caligraphicC or not
+    itwasinCaligraphicC = False
+    if refaper in data.caligraphicC.loc:
+        data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
+        data.caligraphicC.removeIndex(refaper)
+        itwasinCaligraphicC = True
+        # I NEED to recalculate this in order to update the vector variable beamGrad to be used in the PP Problem
+        data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper)
+    # Do as if the dose was zero coming from that aperture
+    data.calcDose()
+    data.calcGradientandObjValue()
+    # Select a new aperture for that particular location
+    pstar, lm, rm, bestApertureIndex, kmeasure = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim,
+                                                                              beamletwidth)
+    # Put the aperture back in
+    if itwasinCaligraphicC:
+        data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
+        data.notinC.removeIndex(bestApertureIndex)
+    # If the new aperture is not good, don't waste more time and return 0
+    if pstar > 0:
+            return(0)
+    else:
+        # Solve the instance of the RMP associated with caligraphicC. But make sure to put everything back to the values
+        # where it was before
+        lmsave = beamList[bestApertureIndex].llist
+        rmsave = beamList[bestApertureIndex].rlist
+        beamList[bestApertureIndex].llist = lm
+        beamList[bestApertureIndex].rlist = rm
+        # Precalculate the aperture map to save times.
+        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+        data.rmpres = solveRMC(data.YU)
+        beamList[bestApertureIndex].llist = lmsave
+        beamList[bestApertureIndex].rlist = rmsave
+        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+    return(data.rmpres.fun - oldobj)
 
 def column_generation(C):
     C2 = 1.0
@@ -880,25 +913,34 @@ def column_generation(C):
         print('notinC: ', data.notinC.angle)
     # Set up an order to go refining one by one.
     if refinementloops:
-        intensepengList = []
-        for mynumbeam in rangenumbeams:
-            intensepengList.append(data.rmpres.x[mynumbeam])
-        # pengList will contain a list of the different apertures in growing order of intensity
-        pengList = [x for _,x in sorted(zip(intensepengList, rangenumbeams), key = lambda pair: pair[0])]
-        oldObjectiveValue = data.rmpres.fun
         refinementLoopCounter = 0
         while refinementLoopCounter < 10:
             refinementLoopCounter += 1
+            # Create the list of contributions
+            contributionsPengList = []
+            oldObjectiveValue = data.rmpres.fun #Base to compare against
+            for mynumbeam in rangenumbeams:
+                contributionsPengList.append(contributionofBeam(mynumbeam, oldObjectiveValue, C, C2, C3, vmax, beamletwidth))
+            # pengList will contain a list of the different apertures in decreasing order of contribution
+            pengList = [x for _, x in sorted(zip(contributionsPengList, rangenumbeams), key=lambda pair: pair[0], reverse=True)]
             for refaper in pengList:
                 print('rechecking aperture:', refaper)
+                # Remove aperture from the set temporarily
+                itwasinCaligraphicC = False
+                if refaper in data.caligraphicC.loc:
+                    data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
+                    data.caligraphicC.removeIndex(refaper)
+                    itwasinCaligraphicC = True
+                # Calculate dose and gradients
                 data.calcDose()
                 data.calcGradientandObjValue()
-                data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
-                data.caligraphicC.removeIndex(refaper)
+                # Select a new aperture for that particular location
                 pstar, lm, rm, bestApertureIndex, kmeasure = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth)
                 # Update caligraphic C. why?
                 if pstar >= 0:
                     continue #No aperture can make things better
+                data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
+                data.notinC.removeIndex(bestApertureIndex)
                 # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
                 beamList[bestApertureIndex].llist = lm
                 beamList[bestApertureIndex].rlist = rm
@@ -915,12 +957,10 @@ def column_generation(C):
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
                 break
-            oldObjectiveValue = data.rmpres.fun
-            plotcounter = plotcounter + beam.numBeams
         if eliminationPhase | refinementloops:
-            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
         else:
-            printresults(plotcounter, dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
+            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
                                  C)
 
     plotApertures(C)
@@ -968,7 +1008,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     plt.ylabel('Fractional Volume')
     plt.title('Iteration: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
-    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT' + str(Cvalue) + '.png')
+    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT' + str(Cvalue) + str(iterationNumber) + '.png')
     plt.close()
 
 def plotApertures(C):
@@ -1025,7 +1065,7 @@ del blist
 del dlist
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
 
-CValue = 0.001
+CValue = 0.00000001
 finalintensities = column_generation(CValue)
 averageNW = 0.0
 averageW = 0.0
