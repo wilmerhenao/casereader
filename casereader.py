@@ -926,11 +926,10 @@ def column_generation(C):
             for refaper in pengList:
                 print('rechecking aperture:', refaper)
                 # Remove aperture from the set temporarily
-                itwasinCaligraphicC = False
                 if refaper in data.caligraphicC.loc:
                     data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
                     data.caligraphicC.removeIndex(refaper)
-                    itwasinCaligraphicC = True
+                    data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper)
                 # Calculate dose and gradients
                 data.calcDose()
                 data.calcGradientandObjValue()
