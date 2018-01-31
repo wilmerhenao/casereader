@@ -442,15 +442,24 @@ del blist
 del dlist
 CValue = 1.0
 # find initial location
-data.currentIntensities = np.zeros(beamlet.numBeamlets) + 1.0
+data.currentIntensities = np.zeros(beamlet.numBeamlets)
 data.calcDose(data.currentIntensities)
 before  = time.time()
 data.res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds=[(0, None) for i in range(0, len(data.currentIntensities))], options={'ftol':1e-6,'disp':5})
+print('result:', data.res.x)
+
 PIK = dropbox + '/Research/VMAT/casereader/datares.pickle'
 print(PIK)
 with open(PIK, "wb") as f:
     pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 f.close()
+
+PIK = dropbox + '/Research/VMAT/casereader/beamletlist.pickle'
+print(PIK)
+with open(PIK, "wb") as f:
+    pickle.dump(beamletList, f, pickle.HIGHEST_PROTOCOL)
+f.close()
+
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
 after = time.time()
 print('The whole program took: '  + str(time.time() - start) + ' seconds to finish')

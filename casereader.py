@@ -15,6 +15,7 @@ import math
 import pylab
 import matplotlib.pyplot as plt
 import pickle
+from collections import Counter
 
 # List of organs that will be used
 structureListRestricted = [4,      8,    1,   7,     0   ]
@@ -299,6 +300,8 @@ def getDmatrixPieces():
         myranges = []
         for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+        cancerrange = range(structureList[7].StartPointIndex, structureList[i].EndPointindex)
+        cnt = Counter()
         ## Read the beams now.
         counter = 0
         for fl in [datafiles[x] for x in thiscase]:
@@ -314,10 +317,18 @@ def getDmatrixPieces():
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
+                        if k in cancerrange:
+                            for blt in indices[k]:
+                                cnt[blt] += 1
             gc.collect()
             del indices
             del doses
             del input
+        PIK = dropbox + '/Research/VMAT/casereader/fromwhere.pickle'
+        print(PIK)
+        with open(PIK, "wb") as f:
+            pickle.dump(cnt, f, pickle.HIGHEST_PROTOCOL)
+        f.close()
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
@@ -863,6 +874,7 @@ def column_generation(C):
         pstarlist, lmlist, rmlist, bestApertureIndexlist, kmeasurelist, goodaperturesreceived = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth)
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
+        print('pstar0', pstarlist[0], bestApertureIndexlist[0])
         if pstarlist[0] >= 0:
             #This choice includes the case when no aperture was selected
             print('Program finishes because no aperture was selected to enter')
@@ -1005,7 +1017,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
-    plt.title('Iteration: ' + str(iterationNumber))
+    plt.title('Number of Beams: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
     plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT' + str(Cvalue) + str(iterationNumber) + '.png')
     plt.close()
