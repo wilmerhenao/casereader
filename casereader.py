@@ -18,19 +18,19 @@ import pickle
 from collections import Counter
 
 # List of organs that will be used
-structureListRestricted = [4,      8,    1,   7,     0   ]
+structureListRestricted = [4,      8,    1,   7,     0   , 5]
 #limits                    27,     30,    24,   36-47,  22
-#names                     esof,   trach, prv2, tumor, chord
-threshold  =              [0,      0,      0,      41,     0   ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
-overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6]
+#names                     esof,   trach, prv2, tumor, chord, larynx
+threshold  =              [0,      0,      0,      41,     0, 0   ]
+undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0, 0.0  ]
+overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6, 10E-6]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 18)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
-easyread = True
-refinementloops = True #This loop supercedes the eliminationPhase
+easyread = False
+refinementloops = False #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 
 gc.enable()
@@ -300,8 +300,6 @@ def getDmatrixPieces():
         myranges = []
         for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
-        cancerrange = range(structureList[7].StartPointIndex, structureList[i].EndPointindex)
-        cnt = Counter()
         ## Read the beams now.
         counter = 0
         for fl in [datafiles[x] for x in thiscase]:
@@ -317,18 +315,10 @@ def getDmatrixPieces():
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
-                        if k in cancerrange:
-                            for blt in indices[k]:
-                                cnt[blt] += 1
             gc.collect()
             del indices
             del doses
             del input
-        PIK = dropbox + '/Research/VMAT/casereader/fromwhere.pickle'
-        print(PIK)
-        with open(PIK, "wb") as f:
-            pickle.dump(cnt, f, pickle.HIGHEST_PROTOCOL)
-        f.close()
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
         if debugmode:
