@@ -18,12 +18,12 @@ import pickle
 from collections import Counter
 
 # List of organs that will be used
-structureListRestricted = [4,      8,    1,   7,     0   , 5]
+structureListRestricted = [4,      8,    1,   7,     0   ]
 #limits                    27,     30,    24,   36-47,  22
 #names                     esof,   trach, prv2, tumor, chord, larynx
-threshold  =              [0,      0,      0,      41,     0, 0   ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0, 0.0  ]
-overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6, 10E-6]
+threshold  =              [0,      0,      0,      41,     0, ]
+undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0, ]
+overcoeff  =              [10E-6, 10E-9, 10E-7,  10E-5,  10E-6]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 18)]
 fullcase   = [i for i in range(180)]
