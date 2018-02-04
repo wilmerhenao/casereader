@@ -96,12 +96,6 @@ try:
 except IOError:
     print("Could not open file.  Creating a new one.")
 print('lengths')
-print(len(tester.Structures))
-print(len(tester.Beamlets))
-print(len(tester.Beams))
-print(len(tester.Points))
-#print(tester.Beams[179])
-#print(tester.Beamlets[5040*4-1])
 ### Working on dose to points
 def get_files_by_file_size(dirname, reverse=False):
     """ Return list of file paths in directory sorted by file size """
@@ -144,7 +138,7 @@ for folder in datafolders:
                 thisindex = bd.Index + accumulator # This is the index of the beamlet
                 for k, alist in beamletdict.items():
                     if thisindex <= alist[1] and thisindex >= alist[0]:
-                        d[k].append([pd.Index, bd])
+                        d[k].append([thisindex, bd]) # Wilmer! Revisa esto aca.
         for namefile, elements in d.items():
             output = open(resultslocation + namefile + '.pickle', 'ab')
             pickle.dump(elements, output)
