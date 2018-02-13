@@ -1,33 +1,26 @@
 #! /opt/intel/intelpython35/bin/python3.5
 
 import dose_to_points_data_pb2
-import sys
 import os
 import time
 import gc
 import numpy as np
 from scipy import sparse
 from scipy.optimize import minimize
-from multiprocessing import Pool
-from functools import partial
 import socket
-import math
 import pylab
 import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-structureListRestricted = [4,      8,    1,   7,     0   ]
-#structureListRestricted = [6,      11,    13,   14,     15   ]
-#limits                    27,     30,    24,   36-47,  22
-#names                     esof,   trach, prv2, tumor
-threshold  =              [0,      0,      0,      41,     0   ]
+structureListRestricted = [4,      8,      1,       7,     0 ]
+threshold  =              [0,      0,      0,      41,     0 ]
 undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
 overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6]
 numcores = 8
-testcase = [i for i in range(0, 180, 18)]
+testcase = [i for i in range(0, 180, 10)]
 fullcase = [i for i in range(180)]
-debugmode = False
+debugmode = True
 easyread = False
 
 gc.enable()

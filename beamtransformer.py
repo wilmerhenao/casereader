@@ -11,7 +11,6 @@ class beamletdose:
         self.Index = a.Index
         self.Dose = a.Dose
 
-
 def load(filename):
     with open(filename, "rb") as f:
         while True:

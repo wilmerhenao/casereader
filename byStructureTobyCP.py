@@ -1,6 +1,6 @@
 #! /opt/intel/intelpython35/bin/python3.5
 
-import dose_to_points_data_pb2
+import DoseToPoints_pb2
 import sys
 import gc
 import os
@@ -20,13 +20,13 @@ elif 'sharkpool' == socket.gethostname(): # MY HOUSE
 else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
-datafiles = [datalocation + "/by-Structure/PsVM2_90_2_2/850747bb-6c8e-4c1c-897e-8788bf4c2858",
-             datalocation + "/by-Structure/PsVM1_180_92_2/67d05ef0-1447-4ae3-9b46-926fe2f1a8cd",
-             datalocation + "/by-Structure/PsVM4_270_182_2/472ae384-302f-41b5-b68f-d7c6990334a1",
-             datalocation + "/by-Structure/PsVM3_0_272_2/d592474d-dc94-4f8a-b8e5-a6a35f895393"]
+datafiles = [datalocation + "/by-Structure/PsVM2m_2_90_2/fc0a4f7a-04ab-4e90-90ce-a39005760280",
+             datalocation + "/by-Structure/PsVM1m_92_180_2/195af10c-705a-4867-a95a-dc3d2f60b0eb",
+             datalocation + "/by-Structure/PsVM4m_182_270_2/f24672e5-c46c-44fa-9211-4df2591f1b4f",
+             datalocation + "/by-Structure/PsVM3m_272_0_2/8cfc980e-9e04-4afb-b938-5f9702f7f4a6"]
 resultslocation = "/mnt/datadrive/Dropbox/Data/spine360/by-Beam/"
 # The first file will contain all the structure data, the rest will contain pointodoses.
-alldata = dose_to_points_data_pb2.DoseToPointsData()
+alldata = DoseToPoints_pb2.DoseToPointsData()
 numstructs = []
 flag = True
 accumulator = 0
@@ -35,7 +35,7 @@ for thisfile in datafiles:
     print('reading file ' + thisfile)
     # Start with reading structures, numvoxels and all that.
     try:
-        dpdata = dose_to_points_data_pb2.DoseToPointsData()
+        dpdata = DoseToPoints_pb2.DoseToPointsData()
         f = open(thisfile, "rb")
         dpdata.ParseFromString(f.read())
         f.close()
@@ -75,8 +75,7 @@ for b in alldata.Beams:
     thisindex = b.Id
     beamletdict[thisindex].append(b.StartBeamletIndex)
     beamletdict[thisindex].append(b.EndBeamletIndex)
-
-
+[print(b) for b in beamletdict.items()]
 # Perform tests on the data.
 try:
     f = open(resultslocation + "identificationSpine2.protostream", "wb")
@@ -87,7 +86,7 @@ except IOError:
 print('termino')
 print('Reading test')
 try:
-    tester = dose_to_points_data_pb2.DoseToPointsData()
+    tester = DoseToPoints_pb2.DoseToPointsData()
     f = open(resultslocation + "identificationSpine2.protostream", "rb")
     tester.ParseFromString(f.read())
     #for p in tester.Points:
@@ -116,29 +115,30 @@ def get_files_by_file_size(dirname, reverse=False):
     for i in range(len(filepaths)):
         filepaths[i] = filepaths[i][0]
     return(filepaths)
-
-datafolders = [datalocation + "/by-Structure/PsVM2_90_2_2/",
-               datalocation + "/by-Structure/PsVM1_180_92_2/",
-               datalocation + "/by-Structure/PsVM4_270_182_2/",
-               datalocation + "/by-Structure/PsVM3_0_272_2/"]
 accumulator = 0
+datafolders = [datalocation + "/by-Structure/PsVM2m_2_90_2/",
+             datalocation + "/by-Structure/PsVM1m_92_180_2/",
+             datalocation + "/by-Structure/PsVM4m_182_270_2/",
+             datalocation + "/by-Structure/PsVM3m_272_0_2/"]
 for folder in datafolders:
     files = get_files_by_file_size(folder)
     files.pop(0)
     for file in files:
         d = defaultdict(list)
-        print(file)
+        print('reading file:', file)
         f = open(file, "rb")
-        dpdata = dose_to_points_data_pb2.DoseToPointsData()
+        dpdata = DoseToPoints_pb2.DoseToPointsData()
         dpdata.ParseFromString(f.read())
         f.close()
         for pd in dpdata.PointDoses:
             # pd.Index here represents the index of the voxel
             for bd in pd.BeamletDoses:
-                thisindex = bd.Index + accumulator # This is the index of the beamlet
+                thisindex = bd.Index + accumulator #This is the index of the b
                 for k, alist in beamletdict.items():
                     if thisindex <= alist[1] and thisindex >= alist[0]:
+                        #print(pd.Index, bd.Dose)# eamlet
                         d[k].append([thisindex, bd]) # Wilmer! Revisa esto aca.
+        print('resultslocations', resultslocation)
         for namefile, elements in d.items():
             output = open(resultslocation + namefile + '.pickle', 'ab')
             pickle.dump(elements, output)

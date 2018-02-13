@@ -30,7 +30,7 @@ fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
 easyread = False
-refinementloops = False #This loop supercedes the eliminationPhase
+refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 
 gc.enable()
