@@ -346,9 +346,9 @@ d = getDmatrixPieces()
 def treatDictionary(d):
     m = [[0 for x in range(180)] for y in range(180)]
     for i in d.keys():
-        im = int(int(i[44:].split('.')[0])/2)
+        im = int(int(i[53:].split('.')[0])/2)
         for j in d.keys():
-            jm = int(int(j[44:].split('.')[0])/2)
+            jm = int(int(j[53:].split('.')[0])/2)
             if 100 == im and 101 == jm:
                 global mycomparison
                 mycomparison = d[i][:10] + d[j][:10]
