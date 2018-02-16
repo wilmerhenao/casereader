@@ -352,12 +352,12 @@ def treatDictionary(d):
             if 100 == im and 101 == jm:
                 global mycomparison
                 mycomparison = d[i][:10] + d[j][:10]
-            m[im][jm] = np.intersect1d(d[i][:2000], d[j][:2000]).size
+            m[im][jm] = np.intersect1d(d[i][:50], d[j][:50]).size
     return(np.array(m))
 
 m = treatDictionary(d)
 plt.imshow(m, cmap='hot', interpolation='nearest')
-plt.savefig('heatmap180beams200.png')
+plt.savefig('heatmap180beams.png')
 PIK = 'm.dat'
 with open(PIK, "wb") as f:
     pickle.dump(m, f, pickle.HIGHEST_PROTOCOL)
@@ -365,3 +365,4 @@ f.close()
 gc.collect()
 print(m)
 print(mycomparison)
+print(min(m))

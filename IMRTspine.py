@@ -14,13 +14,14 @@ import pickle
 
 # List of organs that will be used
 structureListRestricted = [4,      8,      1,       7,     0 ]
-threshold  =              [0,      0,      0,      41,     0 ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0  ]
-overcoeff  =              [10E-6,10E-9, 10E-7,  10E-5,  10E-6]
+                        #esoph,  trachea,cordprv, ptv,    cord
+threshold  =              [5,      5,      5,      44,     5 ]
+undercoeff =              [0.0,    0.0,   0.0,  8*10E-4,  0.0  ]
+overcoeff  =              [10E-5,10E-6, 10E-3,  10E-4,  10E-3]
 numcores = 8
 testcase = [i for i in range(0, 180, 10)]
 fullcase = [i for i in range(180)]
-debugmode = True
+debugmode = False
 easyread = False
 
 gc.enable()
@@ -61,12 +62,12 @@ class structure(object):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
-            self.threshold = 42
-            self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 0.0004
+            self.threshold = 44
+            self.overdoseCoeff = 0.01
+            self.underdoseCoeff = 0.0008
         else:
             structure.numOARs += 1
-            self.threshold = 0
+            self.threshold = 10
             self.overdoseCoeff = 0.00001
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
