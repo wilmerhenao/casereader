@@ -29,7 +29,7 @@ gc.enable()
 ## Find out the variables according to the hostname
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
-    datalocation = "/mnt/fastdata/Data/spine360/by-Beam/"
+    datalocation = '/mnt/datadrive/Dropbox/Data/spine360/by-Beam/'
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
@@ -270,7 +270,7 @@ def getDmatrixPieces():
         del indices
         del doses
         del input
-        d[fl] = [ i[0] for i in sorted(enumerate(dlist), key = lambda x : x[1], reverse = True)]
+        d[fl] = [ i[0] for i in sorted(enumerate(dlist), key = lambda x : x[1])]#, reverse = True)]
     PIK = 'd.dat'
     with open(PIK, "wb") as f:
         pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
@@ -341,7 +341,7 @@ for v in range(numvoxels):
 print('total number of voxels read:', voxel.numVoxels)
 ## Free the memory
 dpdata = None
-
+mycomparison = None
 d = getDmatrixPieces()
 def treatDictionary(d):
     m = [[0 for x in range(180)] for y in range(180)]
@@ -349,7 +349,10 @@ def treatDictionary(d):
         im = int(int(i[44:].split('.')[0])/2)
         for j in d.keys():
             jm = int(int(j[44:].split('.')[0])/2)
-            m[im][jm] = np.intersect1d(d[i][:200], d[j][:200]).size
+            if 100 == im and 101 == jm:
+                global mycomparison
+                mycomparison = d[i][:10] + d[j][:10]
+            m[im][jm] = np.intersect1d(d[i][:2000], d[j][:2000]).size
     return(np.array(m))
 
 m = treatDictionary(d)
@@ -361,3 +364,4 @@ with open(PIK, "wb") as f:
 f.close()
 gc.collect()
 print(m)
+print(mycomparison)

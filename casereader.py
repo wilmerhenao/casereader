@@ -42,9 +42,9 @@ if 'radiation-math' == socket.gethostname(): # LAB
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
-elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
-    dropbox = "/home/wilmer/Dropbox"
+#elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
+#    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
+#    dropbox = "/home/wilmer/Dropbox"
 else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
@@ -274,6 +274,7 @@ gc.collect()
 ## Get the point to dose data in a sparse matrix
 def getDmatrixPieces():
     if easyread:
+        # The analyse vectors are not being changed here because they will be read AFTER the optimization is done
         print('doing an easyread')
         if debugmode:
             PIK = 'testdump.dat'
@@ -291,6 +292,9 @@ def getDmatrixPieces():
         newvcps = []
         newbcps = []
         newdcps = []
+        #dvhvcps = []
+        #dvhbcps = []
+        #dvhdcps = []
 
         thiscase = fullcase
         if debugmode:
@@ -310,24 +314,36 @@ def getDmatrixPieces():
             indices, doses = pickle.load(input)
             input.close()
             for k in indices.keys():
+                enteredRanges = False
                 for m in myranges:
                     if k in m:
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
+                        enteredRanges = True
+                #if not enteredRanges: #Only enter here if the structured dvhd is not going to be optimized
+                #    dvhvcps += [k] * len(indices[k])  # This is the voxel we're dealing with
+                #    dvhbcps += indices[k]
+                #    dvhdcps += doses[k]
             gc.collect()
             del indices
             del doses
             del input
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
+        #dvhsave = [dvhbcps, dvhvcps, dvhdcps]
         if debugmode:
             PIK = 'testdump.dat'
+            #DVH = 'testdvhdump.dat'
         else:
             PIK = 'fullcasedump.dat'
+            #DVH = 'fullcaseDVHdump.dat'
         with open(PIK, "wb") as f:
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
         f.close()
+        #with open(DVH, "wb") as f:
+        #    pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
+        #f.close()
     return(newvcps, newbcps, newdcps)
 #------------------------------------------------------------------------------------------------------------------
 
@@ -963,7 +979,6 @@ def column_generation(C):
         else:
             printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
                                  C)
-
     plotApertures(C)
     mynumbeams = beam.numBeams
     M = beam.M

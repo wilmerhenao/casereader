@@ -24,7 +24,7 @@ datafiles = [datalocation + "/by-Structure/PsVM2m_2_90_2/fc0a4f7a-04ab-4e90-90ce
              datalocation + "/by-Structure/PsVM1m_92_180_2/195af10c-705a-4867-a95a-dc3d2f60b0eb",
              datalocation + "/by-Structure/PsVM4m_182_270_2/f24672e5-c46c-44fa-9211-4df2591f1b4f",
              datalocation + "/by-Structure/PsVM3m_272_0_2/8cfc980e-9e04-4afb-b938-5f9702f7f4a6"]
-resultslocation = "/mnt/datadrive/Dropbox/Data/spine360/by-Beam/"
+resultslocation = "/mnt/datadrive/Dropbox/Data/spine360/numbernames/"
 # The first file will contain all the structure data, the rest will contain pointodoses.
 alldata = DoseToPoints_pb2.DoseToPointsData()
 numstructs = []
@@ -115,7 +115,9 @@ def get_files_by_file_size(dirname, reverse=False):
     for i in range(len(filepaths)):
         filepaths[i] = filepaths[i][0]
     return(filepaths)
+
 accumulator = 0
+
 datafolders = [datalocation + "/by-Structure/PsVM2m_2_90_2/",
              datalocation + "/by-Structure/PsVM1m_92_180_2/",
              datalocation + "/by-Structure/PsVM4m_182_270_2/",
@@ -124,7 +126,7 @@ for folder in datafolders:
     files = get_files_by_file_size(folder)
     files.pop(0)
     for file in files:
-        d = defaultdict(list)
+        d = defaultdict(list) # d is organized by beams [2, ..., 360]
         print('reading file:', file)
         f = open(file, "rb")
         dpdata = DoseToPoints_pb2.DoseToPointsData()
@@ -133,16 +135,17 @@ for folder in datafolders:
         for pd in dpdata.PointDoses:
             # pd.Index here represents the index of the voxel
             for bd in pd.BeamletDoses:
-                thisindex = bd.Index + accumulator #This is the index of the b
+                bd.Index += accumulator #This is the index of the b
                 for k, alist in beamletdict.items():
-                    if thisindex <= alist[1] and thisindex >= alist[0]:
-                        #print(pd.Index, bd.Dose)# eamlet
-                        d[k].append([thisindex, bd]) # Wilmer! Revisa esto aca.
+                    if bd.Index <= alist[1] and bd.Index >= alist[0]:
+                        #print(file, pd.Index, bd.Dose)# eamlet
+                        d[k].append([pd.Index, bd]) # Here I append a list of [voxel Index, dose] (a triplet for sparse matrices input)
         print('resultslocations', resultslocation)
         for namefile, elements in d.items():
             output = open(resultslocation + namefile + '.pickle', 'ab')
-            pickle.dump(elements, output)
+            pickle.dump(elements, output) # Here I dump [beamlet Index, Doses to all voxels]
             output.close()
         d = None
     accumulator += accumulatorlist.pop(0)
+
 sys.exit()

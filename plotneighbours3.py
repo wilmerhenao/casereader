@@ -255,22 +255,24 @@ def getDmatrixPieces():
     ## Read the beams now.
     counter = 0
     d = dict()
-    for fl in [datafiles[x] for x in thiscase]:
-        counter += 1
-        print('reading datafile:', counter, fl)
-        input = open(fl, 'rb')
-        indices, doses = pickle.load(input)
-        input.close()
-        dlist = np.zeros(voxel.numVoxels, dtype = float)
-        for k in indices.keys(): # Cycle in the voxels.
-            for m in myranges:
-                if k in m:
-                    dlist[k] = sum(doses[k])
-        gc.collect()
-        del indices
-        del doses
-        del input
-        d[fl] = [ i[0] for i in sorted(enumerate(dlist), key = lambda x : x[1], reverse = True)]
+    input = open('/mnt/fastdata/Data/spine360/by-Beam/twolists200.pickle', 'rb')
+    indices, doses = pickle.load(input)
+    input.close()
+
+    input = open('/mnt/fastdata/Data/spine360/by-Beam/twolists350.pickle', 'rb')
+    indicesb, dosesb = pickle.load(input)
+    input.close()
+    dlist = np.zeros(voxel.numVoxels, dtype = float)
+    dlistb = np.zeros(voxel.numVoxels, dtype = float)
+    alist = np.zeros(voxel.numVoxels, dtype = float)
+    for k in indices.keys(): # Cycle in the voxels.
+        for m in myranges:
+            if k in m:
+                dlist[k] = sum(doses[k])
+                dlistb[k] = sum(dosesb[k])
+                alist[k] = dlist[k] - dlistb[k]
+    gc.collect()
+    print('maxdiff: ', max(alist))
     PIK = 'd.dat'
     with open(PIK, "wb") as f:
         pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
@@ -342,6 +344,9 @@ print('total number of voxels read:', voxel.numVoxels)
 ## Free the memory
 dpdata = None
 
+/home/wilmer/Dropbox/Data/spine360/by-Structure/PsVM4m_182_270_2/ad0f4fc3-6f05-4f1a-83d9-3648721ce1d5
+
+sys.exit()
 d = getDmatrixPieces()
 def treatDictionary(d):
     m = [[0 for x in range(180)] for y in range(180)]
