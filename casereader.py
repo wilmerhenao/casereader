@@ -15,21 +15,21 @@ import math
 import pylab
 import matplotlib.pyplot as plt
 import pickle
-from collections import Counter
 
-# List of organs that will be used
-structureListRestricted = [4,      8,    1,   7,     0   ]
+# List of organs that will be used# List of organs that will be used
+structureListRestricted = [4,      8,      1,       7,     0 ]
 #limits                    27,     30,    24,   36-47,  22
-#names                     esof,   trach, prv2, tumor, chord, larynx
-threshold  =              [0,      0,      0,      41,     0, ]
-undercoeff =              [0.0,    0.0,   0.0,  10E-5,  0.0, ]
-overcoeff  =              [10E-6, 10E-9, 10E-7,  10E-5,  10E-6]
+                        #esoph,  trachea,cordprv, ptv,    cord
+threshold  =              [5,      10,      5,      43,     5 ]
+undercoeff =              [0.0,    0.0,   0.0,   2E-2,  0.0  ]
+overcoeff  =              [10E-5, 10E-7, 6E-4,   9E-3,  5E-4]
+structureListRestricted = [4,      8,    1,   7,     0   ]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 18)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
-easyread = False
+easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 
@@ -277,9 +277,9 @@ def getDmatrixPieces():
         # The analyse vectors are not being changed here because they will be read AFTER the optimization is done
         print('doing an easyread')
         if debugmode:
-            PIK = 'testdump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/by-Beam/testdump.dat'
         else:
-            PIK = 'fullcasedump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/by-Beam/fullcasedump.dat'
         with open(PIK, "rb") as f:
             datasave = pickle.load(f)
         f.close()
@@ -333,10 +333,10 @@ def getDmatrixPieces():
         datasave = [newbcps, newvcps, newdcps]
         #dvhsave = [dvhbcps, dvhvcps, dvhdcps]
         if debugmode:
-            PIK = 'testdump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/by-Beam/testdump.dat'
             #DVH = 'testdvhdump.dat'
         else:
-            PIK = 'fullcasedump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/by-Beam/fullcasedump.dat'
             #DVH = 'fullcaseDVHdump.dat'
         with open(PIK, "wb") as f:
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
@@ -416,7 +416,7 @@ class problemData():
 # Output:   validbeamlets ONLY contains those beamlet INDICES for which we have available data in this beam angle
 #           validbeamletspecialrange is the same as validbeamlets but appending the endpoints
 def fvalidbeamlets(index):
-    validbeamlets = np.array(range(beamList[index].leftEdge + 1, beamList[index].rightEdge - 1))
+    validbeamlets = np.array(range(beamList[index].leftEdge + 1, beamList[index].rightEdge )) # Wilmer changed this line
     validbeamletspecialrange = np.append(np.append(min(validbeamlets) - 1, validbeamlets), max(validbeamlets) + 1)
     # That last line appends the endpoints.
     return (validbeamlets, validbeamletspecialrange)
@@ -591,7 +591,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
 def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw):
     thisApertureIndex = i
-    print("analysing available aperture" , thisApertureIndex)
+    # print("analysing available aperture" , thisApertureIndex)
     # Find the successor and predecessor of this particular element
     try:
         #This could be done with angles instead of indices (reconsider this at some point)
@@ -881,6 +881,8 @@ def column_generation(C):
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
         print('pstar0', pstarlist[0], bestApertureIndexlist[0])
+        if 136 ==  bestApertureIndexlist[0]:
+            print('stop here for a second')
         if pstarlist[0] >= 0:
             #This choice includes the case when no aperture was selected
             print('Program finishes because no aperture was selected to enter')
@@ -965,6 +967,7 @@ def column_generation(C):
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
                 data.rmpres = solveRMC(data.YU)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             print("Let's see round of refinement", refinementLoopCounter)
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
             print('caligraphicC:', data.caligraphicC.angle)
@@ -1061,8 +1064,12 @@ def plotApertures(C):
 start = time.time()
 vlist, blist, dlist = getDmatrixPieces()
 print('total time reading dose to points:', time.time() - start)
+start = time.time()
 data = problemData()
+print('Assigning problemData', time.time() - start)
+start = time.time()
 data.voxelsUsed = np.unique(vlist)
+print('Done doing the np.unique assignment', time.time() - start)
 strsUsd = set([])
 strsIdxUsd = set([])
 for v in data.voxelsUsed:

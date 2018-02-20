@@ -13,15 +13,15 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used
-structureListRestricted = [4,      8,      1,       7,     0 ]
+structureListRestricted = [4,      8,       1,       7,     0 ]
                         #esoph,  trachea,cordprv, ptv,    cord
-threshold  =              [5,      5,      5,      44,     5 ]
-undercoeff =              [0.0,    0.0,   0.0,  8*10E-4,  0.0  ]
-overcoeff  =              [10E-5,10E-6, 10E-3,  10E-4,  10E-3]
+threshold  =              [5,      10,      5,      38,     5 ]
+undercoeff =              [0.0,    0.0,   0.0,   9E-1,  0.0   ]
+overcoeff  =              [10E-6, 10E-7, 6E-3,   9E-3,  5E-4  ]
 numcores = 8
-testcase = [i for i in range(0, 180, 10)]
+testcase = [i for i in range(0, 180, 60)]
 fullcase = [i for i in range(180)]
-debugmode = False
+debugmode = True
 easyread = False
 
 gc.enable()
@@ -287,6 +287,10 @@ def getDmatrixPieces():
         newbcps = []
         newdcps = []
 
+        dvhvcps = []
+        dvhbcps = []
+        dvhdcps = []
+        
         thiscase = fullcase
         if debugmode:
             thiscase = testcase
@@ -310,6 +314,15 @@ def getDmatrixPieces():
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
+                    else:
+                        dvhvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
+                        dvhbcps += indices[k]
+                        dvhdcps += doses[k]
+                        dvhdump = 'dvhdump.dat'
+                        dvhsave = [dvhbcps, dvhvcps, dvhdcps]
+                        with open(dvhdump, "ab") as f:
+                            pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
+                        f.close()  
             gc.collect()
             del indices
             del doses
@@ -439,7 +452,7 @@ CValue = 1.0
 data.currentIntensities = np.zeros(beamlet.numBeamlets)
 data.calcDose(data.currentIntensities)
 before  = time.time()
-data.res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds=[(0, None) for i in range(0, len(data.currentIntensities))], options={'ftol':1e-6,'disp':5})
+data.res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds=[(0, None) for i in range(0, len(data.currentIntensities))], options={'ftol':1e-4,'disp':5})
 print('result:', data.res.x)
 
 PIK = dropbox + '/Research/VMAT/casereader/datares.pickle'
@@ -457,3 +470,15 @@ f.close()
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
 after = time.time()
 print('The whole program took: '  + str(time.time() - start) + ' seconds to finish')
+
+print('Lets try to print all of the other structures:')
+# Free ressources
+del DmatBig
+del data.DlistT
+# Read the data necessary
+with open("dvhdump.dat", "rb") as f:
+    datasave = pickle.load(f)
+f.close()
+DmatBig = sparse.csr_matrix((datasave[2], (datasave[0], datasave[1])), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
+data.currentDose += DmatBig * data.currentIntensities
+printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
