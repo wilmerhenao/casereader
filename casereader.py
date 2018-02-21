@@ -1069,7 +1069,7 @@ data = problemData()
 print('Assigning problemData', time.time() - start)
 start = time.time()
 data.voxelsUsed = np.unique(vlist)
-print('Done doing the np.unique assignment', time.time() - start)
+print('Done with the np.unique assignment', time.time() - start)
 strsUsd = set([])
 strsIdxUsd = set([])
 for v in data.voxelsUsed:
@@ -1102,5 +1102,4 @@ for i in range(beam.numBeams):
 
 print('averageW:', averageW/beam.numBeams)
 print('averageNW:', averageNW/beam.numBeams)
-
 sys.exit()

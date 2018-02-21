@@ -301,6 +301,11 @@ def getDmatrixPieces():
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
         ## Read the beams now.
         counter = 0
+        dvhdump = 'dvhdump.dat'
+        try:
+            os.remove(dvhdump)
+        except OSError:
+            pass
         for fl in [datafiles[x] for x in thiscase]:
             print(fl)
             counter += 1
@@ -318,7 +323,6 @@ def getDmatrixPieces():
                         dvhvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         dvhbcps += indices[k]
                         dvhdcps += doses[k]
-                        dvhdump = 'dvhdump.dat'
                         dvhsave = [dvhbcps, dvhvcps, dvhdcps]
                         with open(dvhdump, "ab") as f:
                             pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
