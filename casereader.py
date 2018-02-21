@@ -25,7 +25,7 @@ undercoeff =              [0.0,    0.0,   0.0,   2E-2,  0.0  ]
 overcoeff  =              [10E-5, 10E-7, 6E-4,   9E-3,  5E-4]
 structureListRestricted = [4,      8,    1,   7,     0   ]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 18)]
+testcase   = [i for i in range(0, 180, 20)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
@@ -678,6 +678,12 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     negpvalues = max(1, sum([1 for i in pvalues if i < 0]))
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
     indstars = chooseSmallest(respoolinorder[:negpvalues], listinorder[:negpvalues], 10) #This 10 is the degrees of separation
+    print('respoolinorder', respoolinorder)
+    print('negpvalues', negpvalues)
+    print('listinorder', listinorder)
+    print('indstars', indstars)
+    print('pvalues', pvalues)
+    print('respool', respool)
     # Initialize the lists that I'm going to return
     pstarlist = []
     llist = []
@@ -691,6 +697,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
         if pstar > 0:
             # Make sure that I report at least the pstar of the first one in case no one works
             pstarlist.append(pstar)
+            bestApertureIndexlist.append('None Added')
             break #Break the for because it cannot get any better now.
         l = bestgroup[1]
         r = bestgroup[2]

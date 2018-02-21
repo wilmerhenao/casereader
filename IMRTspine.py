@@ -472,7 +472,7 @@ f.close()
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
 after = time.time()
 print('The whole program took: '  + str(time.time() - start) + ' seconds to finish')
-
+print('intensities', data.currentIntensities)
 print('Lets try to print all of the other structures:')
 # Free ressources
 del DmatBig
