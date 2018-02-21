@@ -739,7 +739,7 @@ def updateOpenAperture(i):
         if (beamList[i].llist[m] >= min(validbeamlets) - 1):
             ## I subtract min validbeamlets bec. I want to find coordinates in available space
             ## indleft is where the edge of the left leaf ends. From there on there are photons.
-            indleft = beamList[i].llist[m] + 1 + leftlimits - min(validbeamlets)
+            indleft = beamList[i].llist[m] + leftlimits - min(validbeamlets)
         else:
             # if the left limit is too far away to the left, just take what's available
             indleft = 0
@@ -749,13 +749,13 @@ def updateOpenAperture(i):
             indright = len(validbeamlets) + leftlimits
         else:
             if(beamList[i].rlist[m] >= min(validbeamlets)):
-                ## indright is where the edgo of the right leaf ends. From there on there are photons
-                indright = beamList[i].rlist[m] - 1 + leftlimits - min(validbeamlets)
+                ## indright is where the edge of the right leaf ends.
+                indright = beamList[i].rlist[m] + leftlimits - min(validbeamlets)
             else:
                 # Right limit is to the left of validbeamlets (This situation is weird)
                 indright = 0
 
-        # Keep the location of the letftmost leaf
+        # Keep the location of the leftmost leaf
         leftlimits += len(validbeamlets)
         if (np.floor(indleft) < np.ceil(indright)): ## Just a necessary logical check.
             first = True
