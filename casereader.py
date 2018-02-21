@@ -277,9 +277,9 @@ def getDmatrixPieces():
         # The analyse vectors are not being changed here because they will be read AFTER the optimization is done
         print('doing an easyread')
         if debugmode:
-            PIK = '/mnt/fastdata/Data/spine360/by-Beam/testdump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/testdump.dat'
         else:
-            PIK = '/mnt/fastdata/Data/spine360/by-Beam/fullcasedump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/fullcasedump.dat'
         with open(PIK, "rb") as f:
             datasave = pickle.load(f)
         f.close()
@@ -333,10 +333,10 @@ def getDmatrixPieces():
         datasave = [newbcps, newvcps, newdcps]
         #dvhsave = [dvhbcps, dvhvcps, dvhdcps]
         if debugmode:
-            PIK = '/mnt/fastdata/Data/spine360/by-Beam/testdump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/testdump.dat'
             #DVH = 'testdvhdump.dat'
         else:
-            PIK = '/mnt/fastdata/Data/spine360/by-Beam/fullcasedump.dat'
+            PIK = '/mnt/fastdata/Data/spine360/fullcasedump.dat'
             #DVH = 'fullcaseDVHdump.dat'
         with open(PIK, "wb") as f:
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)

@@ -21,7 +21,7 @@ overcoeff  =              [10E-6, 10E-7, 6E-3,   9E-3,  5E-4  ]
 numcores = 8
 testcase = [i for i in range(0, 180, 60)]
 fullcase = [i for i in range(180)]
-debugmode = True
+debugmode = False
 easyread = False
 
 gc.enable()
