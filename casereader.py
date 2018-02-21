@@ -255,7 +255,7 @@ beamList = []
 print('Reading in Beam Data:')
 for b in range(numbeams):
     beamList.append(beam(dpdata.Beams[b]))
-    for blt in range(dpdata.Beams[b].StartBeamletIndex, dpdata.Beams[b].EndBeamletIndex):
+    for blt in range(dpdata.Beams[b].StartBeamletIndex, (dpdata.Beams[b].EndBeamletIndex+1)):
         beamletList[blt].belongsToBeam = b
 print('There are a total of beams:', beam.numBeams)
 print('beamlet data was updated so they point to their owner')
@@ -437,7 +437,7 @@ def fvalidbeamlets(index):
 # thisApertureIndex = index location in the set of apertures that I have saved.
 def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw):
     # Get the slice of the matrix that I need
-    D = DmatBig[beamList[thisApertureIndex].StartBeamletIndex:beamList[thisApertureIndex].EndBeamletIndex,]
+    D = DmatBig[beamList[thisApertureIndex].StartBeamletIndex:(beamList[thisApertureIndex].EndBeamletIndex + 1),]
     M = beamList[thisApertureIndex].M
     leftEdge = beamList[thisApertureIndex].leftEdge
     rightEdge = beamList[thisApertureIndex].rightEdge
@@ -1089,7 +1089,7 @@ del blist
 del dlist
 print('Assigned DmatBig in seconds: ', time.time() - starttime)
 starttime = time.time()
-data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
 print('Assigned DmatBig in seconds: ', time.time() - starttime)
 
 CValue = 0.00000001

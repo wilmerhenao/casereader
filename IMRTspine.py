@@ -286,10 +286,6 @@ def getDmatrixPieces():
         newvcps = []
         newbcps = []
         newdcps = []
-
-        dvhvcps = []
-        dvhbcps = []
-        dvhdcps = []
         
         thiscase = fullcase
         if debugmode:
@@ -322,19 +318,19 @@ def getDmatrixPieces():
                         newdcps += doses[k]
                         estaaqui = True
                 if not estaaqui:
-                    dvhvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
-                    dvhbcps += indices[k]
-                    dvhdcps += doses[k]
+                    dvhvcps = [k] * len(indices[k]) # This is the voxel we're dealing with
+                    dvhbcps = indices[k]
+                    dvhdcps = doses[k]
+                    dvhsave = [dvhbcps, dvhvcps, dvhdcps]
+                    with open(dvhdump, "ab") as f:
+                        pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
+                    f.close()
             gc.collect()
             del indices
             del doses
             del input
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
-        dvhsave = [dvhbcps, dvhvcps, dvhdcps]
-        with open(dvhdump, "wb") as f:
-            pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
-        f.close()
         if debugmode:
             PIK = 'testdump.dat'
         else:
