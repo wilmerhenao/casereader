@@ -728,7 +728,7 @@ def updateOpenAperture(i):
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
     openapertureStrength = []
-    diagmaker = np.zeros(DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex, ].shape[0], dtype = float)
+    diagmaker = np.zeros(DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1), ].shape[0], dtype = float)
     for m in range(0, len(beamList[i].llist)):
         # Find geographical values of llist and rlist.
         # Find geographical location of the first row.
@@ -757,9 +757,9 @@ def updateOpenAperture(i):
 
         # Keep the location of the leftmost leaf
         leftlimits += len(validbeamlets)
-        if (np.floor(indleft) < np.ceil(indright)): ## Just a necessary logical check.
+        if (np.floor(indleft) < np.ceil(indright) - 1): ## Make sure the thing opened at all.
             first = True
-            for thisbeamlet in range(int(np.floor(indleft)), int(np.ceil(indright))):
+            for thisbeamlet in range(int(np.floor(indleft)) + 1, int(np.ceil(indright))):
                 strength = 1.0
                 if first:
                     first = False
@@ -774,13 +774,13 @@ def updateOpenAperture(i):
                 ## Important: There is no need to check if there exists a last element because after all, you already
                 # checked whe you entered the if loop above this one
                 openapertureStrength[-1] = strength
-                diagmaker[-1] = strength
+                diagmaker[int(np.ceil(indright)) - 1] = strength
 
             ## One last scenario. If only a little bit of the aperture is open (less than a beamlet and within one beamlet
             if 1 == int(np.ceil(indright)) - int(np.floor(indleft)):
                 strength = indright - indleft
                 openapertureStrength[-1] = strength
-                diagmaker[-1] = strength
+                diagmaker[int(np.ceil(indright)) -1] = strength
     openaperturenp = np.array(openaperture, dtype=int) #Contains indices of open beamlets in the aperture
     return(openaperturenp, diagmaker, openapertureStrength)
 
@@ -1082,11 +1082,15 @@ structureNames = []
 for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
+starttime = time.time()
 DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
 del vlist
 del blist
 del dlist
+print('Assigned DmatBig in seconds: ', time.time() - starttime)
+starttime = time.time()
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:beamList[i].EndBeamletIndex,].transpose() for i in range(beam.numBeams)]
+print('Assigned DmatBig in seconds: ', time.time() - starttime)
 
 CValue = 0.00000001
 finalintensities = column_generation(CValue)
