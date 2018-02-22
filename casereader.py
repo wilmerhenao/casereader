@@ -20,9 +20,9 @@ import pickle
 structureListRestricted = [4,      8,      1,       7,     0 ]
 #limits                    27,     30,    24,   36-47,  22
                         #esoph,  trachea,cordprv, ptv,    cord
-threshold  =              [5,      10,      5,      43,     5 ]
+threshold  =              [5,      10,      5,      38,     5 ]
 undercoeff =              [0.0,    0.0,   0.0,   2E-2,  0.0  ]
-overcoeff  =              [10E-5, 10E-7, 6E-4,   9E-3,  5E-4]
+overcoeff  =              [10E-5, 10E-7, 6E-3,   9E-3,  5E-4]
 structureListRestricted = [4,      8,    1,   7,     0   ]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 20)]
@@ -1099,7 +1099,7 @@ starttime = time.time()
 data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
 print('Assigned DmatBig in seconds: ', time.time() - starttime)
 
-CValue = 0.00000001
+CValue = 0.0
 finalintensities = column_generation(CValue)
 averageNW = 0.0
 averageW = 0.0
