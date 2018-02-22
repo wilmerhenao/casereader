@@ -17,13 +17,13 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used# List of organs that will be used
-structureListRestricted = [4,      8,      1,       7,     0 ]
+structureListRestricted = [    4,     8,    1,    7,     0 ]
 #limits                    27,     30,    24,   36-47,  22
                         #esoph,  trachea,cordprv, ptv,    cord
-threshold  =              [5,      10,      5,      38,     5 ]
-undercoeff =              [0.0,    0.0,   0.0,   2E-2,  0.0  ]
-overcoeff  =              [10E-5, 10E-7, 6E-3,   9E-3,  5E-4]
-structureListRestricted = [4,      8,    1,   7,     0   ]
+threshold  =              [    5,    10,    5,   38,     5 ]
+undercoeff =              [  0.0,   0.0,  0.0, 2E-2,   0.0 ]
+overcoeff  =              [10E-5, 10E-7, 6E-3, 9E-3,  5E-4 ]
+structureListRestricted = [    4,     8,    1,    7,     0 ]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 20)]
 fullcase   = [i for i in range(180)]
@@ -32,6 +32,7 @@ debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
+memorySaving = True
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -98,6 +99,7 @@ class beam(object):
         self.JawX2 = sthing.JawX2
         self.JawY1 = sthing.JawY1
         self.JawY2 = sthing.JawY2
+        self.Id = sthing.Id
         # Update local variables
         self.StartBeamletIndex = sthing.StartBeamletIndex
         self.EndBeamletIndex = sthing.EndBeamletIndex
@@ -249,14 +251,15 @@ for blt in range(numbeamlets):
     #print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
 print('total number of beamlets read:', beamlet.numBeamlets)
 #----------------------------------------------------------------------------------------
-# Get the data about beams
+# Get the data about beams. They will be ordered. But the Id will be in half the range
 numbeams = len(dpdata.Beams)
-beamList = []
+beamList = [None] * numbeams
 print('Reading in Beam Data:')
 for b in range(numbeams):
-    beamList.append(beam(dpdata.Beams[b]))
-    for blt in range(dpdata.Beams[b].StartBeamletIndex, (dpdata.Beams[b].EndBeamletIndex+1)):
-        beamletList[blt].belongsToBeam = b
+    mybeam = beam(dpdata.Beams[b])
+    beamList[int(int(mybeam.Id)/2)] = mybeam
+    for blt in range(mybeam.StartBeamletIndex, (mybeam.EndBeamletIndex+1)):
+        beamletList[blt].belongsToBeam = int(mybeam.Id)
 print('There are a total of beams:', beam.numBeams)
 print('beamlet data was updated so they point to their owner')
 #----------------------------------------------------------------------------------------
@@ -345,8 +348,59 @@ def getDmatrixPieces():
         #    pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
         #f.close()
     return(newvcps, newbcps, newdcps)
-#------------------------------------------------------------------------------------------------------------------
 
+#----------------------------------------------------------------------------------------
+## Get the point to dose data in a list of sparse matrices
+def getDmatrixPiecesMemorySaving():
+    ## Initialize vectors for voxel component, beamlet component and dose
+    thiscase = fullcase
+    if debugmode:
+        thiscase = testcase
+
+    # Get the ranges of the voxels that I am going to use and eliminate the rest
+    myranges = []
+    for i in structureListRestricted:
+        myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+    ## Read the beams now.
+    counter = 0
+    beamDs = [None] * beamlet.numBeamlets
+    #Beamlets per beam
+    bpb = beam.N * beam.M
+    uniquev = set()
+    for fl in [datafiles[x] for x in thiscase]:
+        newvcps = []
+        newbcps = []
+        newdcps = []
+        print(fl)
+        counter += 1
+        print('reading datafile:', counter,fl)
+        input = open(fl, 'rb')
+        indices, doses = pickle.load(input)
+        input.close()
+        for k in indices.keys():
+            for m in myranges:
+                if k in m:
+                    newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
+                    newbcps += indices[k]
+                    newdcps += doses[k]
+                    uniquev.add(k)
+        del indices
+        del doses
+        del input
+        # Create the matrix that goes in the list
+        thisbeam = int(int(fl[44:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
+        initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
+        # Transform the space of beamlets to the new coordinate system starting from zero
+        newbcps = [i - initialBeamletThisBeam for i in newbcps]
+        #beamletList[thisbeam].star
+        beamDs[thisbeam] = sparse.csr_matrix((newdcps, (newvcps, newbcps)), shape=(voxel.numVoxels, bpb), dtype=float)
+        del newdcps
+        del newbcps
+        del newvcps
+        gc.collect()
+    return(beamDs, uniquev)
+
+#------------------------------------------------------------------------------------------------------------------
 class problemData():
     def __init__(self):
         self.kappa = []
@@ -363,7 +417,7 @@ class problemData():
         self.strengths = [[] for i in range(beam.numBeams)]
         self.DlistT = None
         self.currentIntensities = np.zeros(beam.numBeams, dtype=float)
-        self.voxelsUsed = None
+        self.voxelsUsed = None # This is going to be a set
         self.structuresUsed = None
         self.structureIndexUsed = None
         self.YU = None
@@ -437,7 +491,10 @@ def fvalidbeamlets(index):
 # thisApertureIndex = index location in the set of apertures that I have saved.
 def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw):
     # Get the slice of the matrix that I need
-    D = DmatBig[beamList[thisApertureIndex].StartBeamletIndex:(beamList[thisApertureIndex].EndBeamletIndex + 1),]
+    if memorySaving:
+        D = data.DlistT[thisApertureIndex].transpose()
+    else:
+        D = DmatBig[beamList[thisApertureIndex].StartBeamletIndex:(beamList[thisApertureIndex].EndBeamletIndex + 1),]
     M = beamList[thisApertureIndex].M
     leftEdge = beamList[thisApertureIndex].leftEdge
     rightEdge = beamList[thisApertureIndex].rightEdge
@@ -735,7 +792,7 @@ def updateOpenAperture(i):
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
     openapertureStrength = []
-    diagmaker = np.zeros(DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1), ].shape[0], dtype = float)
+    diagmaker = np.zeros(beam.N * beam.M, dtype = float)
     for m in range(0, len(beamList[i].llist)):
         # Find geographical values of llist and rlist.
         # Find geographical location of the first row.
@@ -907,6 +964,7 @@ def column_generation(C):
                 beamList[bestApertureIndex].llist = lm
                 beamList[bestApertureIndex].rlist = rm
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
+                allbeamshapes.append((lm, rm, kmeasure))
                 # Precalculate the aperture map to save times.
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
             data.rmpres = solveRMC(data.YU)
@@ -970,6 +1028,7 @@ def column_generation(C):
                 # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
                 beamList[bestApertureIndex].llist = lm
                 beamList[bestApertureIndex].rlist = rm
+                allbeamshapes.append((lm, rm, kmeasure))
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
@@ -1069,14 +1128,26 @@ def plotApertures(C):
     plt.close()
 
 start = time.time()
-vlist, blist, dlist = getDmatrixPieces()
-print('total time reading dose to points:', time.time() - start)
-start = time.time()
 data = problemData()
+allbeamshapes = [] #This will be a list of tuples
 print('Assigning problemData', time.time() - start)
 start = time.time()
-data.voxelsUsed = np.unique(vlist)
-print('Done with the np.unique assignment', time.time() - start)
+if memorySaving:
+    data.DlistT, data.voxelsUsed = getDmatrixPiecesMemorySaving()
+else:
+    vlist, blist, dlist = getDmatrixPieces()
+    data.voxelsUsed = np.unique(vlist)
+    starttime = time.time()
+    DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
+    del vlist
+    del blist
+    del dlist
+    print('Assigned DmatBig in seconds: ', time.time() - starttime)
+    starttime = time.time()
+    data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
+    print('Assigned DmatBig in seconds: ', time.time() - starttime)
+print('total time reading dose to points:', time.time() - start)
+start = time.time()
 strsUsd = set([])
 strsIdxUsd = set([])
 for v in data.voxelsUsed:
@@ -1089,15 +1160,6 @@ structureNames = []
 for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
-starttime = time.time()
-DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
-del vlist
-del blist
-del dlist
-print('Assigned DmatBig in seconds: ', time.time() - starttime)
-starttime = time.time()
-data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
-print('Assigned DmatBig in seconds: ', time.time() - starttime)
 
 CValue = 0.0
 finalintensities = column_generation(CValue)
@@ -1109,4 +1171,8 @@ for i in range(beam.numBeams):
 
 print('averageW:', averageW/beam.numBeams)
 print('averageNW:', averageNW/beam.numBeams)
+PIK = "outputGraphics/allbeamshapes-" + str(C) + "-save.pickle"
+with open(PIK, "wb") as f:
+    pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
+f.close()
 sys.exit()
