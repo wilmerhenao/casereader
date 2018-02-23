@@ -27,7 +27,7 @@ numcores   = 8
 testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = True
+debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -39,9 +39,11 @@ datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
     datalocation = "/mnt/fastdata/Data/spine360/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
+    cutter = 44
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
+    cutter = 51
 #elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
 #    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
 #    dropbox = "/home/wilmer/Dropbox"
@@ -256,7 +258,7 @@ beamList = [None] * numbeams
 print('Reading in Beam Data:')
 for b in range(numbeams):
     mybeam = beam(dpdata.Beams[b])
-    beamList[int(int(mybeam.Id)/2)] = mybeam
+    beamList[int(int(mybeam.Id))] = mybeam
     for blt in range(mybeam.StartBeamletIndex, (mybeam.EndBeamletIndex+1)):
         beamletList[blt].belongsToBeam = int(mybeam.Id)
 print('There are a total of beams:', beam.numBeams)
@@ -352,7 +354,7 @@ def getDmatrixPiecesMemorySaving():
     bpb = beam.N * beam.M
     uniquev = set()
 
-    for fl in ['/mnt/fastdata/Data/spine360/by-Beam/twolists'+ str(2*x) + '.pickle' for x in thiscase]:
+    for fl in [datalocation + 'twolists'+ str(2*x) + '.pickle' for x in thiscase]:
         newvcps = []
         newbcps = []
         newdcps = []
@@ -372,7 +374,7 @@ def getDmatrixPiecesMemorySaving():
         del doses
         del input
         # Create the matrix that goes in the list
-        thisbeam = int(int(fl[44:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
+        thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
         initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
         # Transform the space of beamlets to the new coordinate system starting from zero
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
@@ -382,6 +384,7 @@ def getDmatrixPiecesMemorySaving():
         del newbcps
         del newvcps
         gc.collect()
+
     return(beamDs, uniquev)
 
 #------------------------------------------------------------------------------------------------------------------
