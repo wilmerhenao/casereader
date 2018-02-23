@@ -1,5 +1,4 @@
 #! /opt/intel/intelpython35/bin/python3.5
-
 import dose_to_points_data_pb2
 import sys
 import os
@@ -17,18 +16,18 @@ import matplotlib.pyplot as plt
 import pickle
 
 # List of organs that will be used# List of organs that will be used
-structureListRestricted = [    4,     8,    1,    7,     0 ]
-#limits                    27,     30,    24,   36-47,  22
-                        #esoph,  trachea,cordprv, ptv,    cord
-threshold  =              [    5,    10,    5,   38,     5 ]
-undercoeff =              [  0.0,   0.0,  0.0, 2E-2,   0.0 ]
-overcoeff  =              [10E-5, 10E-7, 6E-3, 9E-3,  5E-4 ]
-structureListRestricted = [    4,     8,    1,    7,     0 ]
+structureListRestricted = [    4,      8,      1,    7,     0 ]
+#limits                   [   27,     30,     24,36-47,    22 ]
+                         #[esoph,trachea,cordprv,  ptv,  cord ]
+threshold  =              [    5,     10,      5,   38,     5 ]
+undercoeff =              [  0.0,    0.0,    0.0, 2E-2,   0.0 ]
+overcoeff  =              [10E-5,  10E-7,   6E-3, 9E-3,  5E-4 ]
+structureListRestricted = [    4,      8,      1,    7,     0 ]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 20)]
+testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -92,14 +91,13 @@ class beam(object):
     JawY2 = None
     def __init__(self, sthing):
         # Update the static counter and other variables
-        self.angle = 2 * beam.numBeams # Notice that this one changes per beam
-        self.location = beam.numBeams
-        beam.numBeams += 1
+        self.location = int(int(sthing.Id)/2)
+        self.Id = self.location
+        self.angle = 2 * self.Id   # Notice that this one changes per beam
         self.JawX1 = sthing.JawX1
         self.JawX2 = sthing.JawX2
         self.JawY1 = sthing.JawY1
         self.JawY2 = sthing.JawY2
-        self.Id = sthing.Id
         # Update local variables
         self.StartBeamletIndex = sthing.StartBeamletIndex
         self.EndBeamletIndex = sthing.EndBeamletIndex
@@ -111,6 +109,7 @@ class beam(object):
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
+        beam.numBeams += 1
 
 class voxel(object):
     numVoxels = 0
@@ -222,7 +221,7 @@ datafiles.sort()
 # Get the data about the structures
 numstructs = len(dpdata.Structures)
 structureList = []
-structureDict = {} # keys are the names of the structure and the value is the corresponding index location (integer)
+structureDict = {}    # keys are the names of the structure and the value is the corresponding index location (integer)
 print("Reading in structures")
 for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
@@ -232,7 +231,7 @@ for s in range(numstructs):
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 # Manual modifications of targets
-print('modifying penalization function according to the 5 structure case')
+print('modifying penalization function for the structures that we want to study')
 strcounter = 0
 # Assign the values for the penalization function F(z)
 for s in structureListRestricted:
@@ -243,12 +242,12 @@ for s in structureListRestricted:
 #----------------------------------------------------------------------------------------
 ## Get the data about beamlets
 numbeamlets = len(dpdata.Beamlets)
-beamletList = []
+beamletList = [None] * numbeamlets
 print('Reading in beamlet data:')
 for blt in range(numbeamlets):
     a = beamlet(dpdata.Beamlets[blt])
-    beamletList.append(a)
-    #print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
+    beamletList[dpdata.Beamlets[blt].Index] = a
+    # print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
 print('total number of beamlets read:', beamlet.numBeamlets)
 #----------------------------------------------------------------------------------------
 # Get the data about beams. They will be ordered. But the Id will be in half the range
@@ -265,10 +264,10 @@ print('beamlet data was updated so they point to their owner')
 #----------------------------------------------------------------------------------------
 ## Get data about voxels.
 numvoxels = len(dpdata.Points)
-voxelList = []
+voxelList = [None] * numvoxels
 print('Reading in Voxel data:')
 for v in range(numvoxels):
-    voxelList.append(voxel(dpdata.Points[v]))
+    voxelList[dpdata.Points[v].Index] = voxel(dpdata.Points[v])
 print('total number of voxels read:', voxel.numVoxels)
 ## Free the memory
 dpdata = None
@@ -295,9 +294,6 @@ def getDmatrixPieces():
         newvcps = []
         newbcps = []
         newdcps = []
-        #dvhvcps = []
-        #dvhbcps = []
-        #dvhdcps = []
 
         thiscase = fullcase
         if debugmode:
@@ -317,36 +313,24 @@ def getDmatrixPieces():
             indices, doses = pickle.load(input)
             input.close()
             for k in indices.keys():
-                enteredRanges = False
                 for m in myranges:
                     if k in m:
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
-                        enteredRanges = True
-                #if not enteredRanges: #Only enter here if the structured dvhd is not going to be optimized
-                #    dvhvcps += [k] * len(indices[k])  # This is the voxel we're dealing with
-                #    dvhbcps += indices[k]
-                #    dvhdcps += doses[k]
             gc.collect()
             del indices
             del doses
             del input
         print('voxels seen:', np.unique(newvcps))
         datasave = [newbcps, newvcps, newdcps]
-        #dvhsave = [dvhbcps, dvhvcps, dvhdcps]
         if debugmode:
             PIK = '/mnt/fastdata/Data/spine360/testdump.dat'
-            #DVH = 'testdvhdump.dat'
         else:
             PIK = '/mnt/fastdata/Data/spine360/fullcasedump.dat'
-            #DVH = 'fullcaseDVHdump.dat'
         with open(PIK, "wb") as f:
             pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
         f.close()
-        #with open(DVH, "wb") as f:
-        #    pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
-        #f.close()
     return(newvcps, newbcps, newdcps)
 
 #----------------------------------------------------------------------------------------
@@ -367,17 +351,17 @@ def getDmatrixPiecesMemorySaving():
     #Beamlets per beam
     bpb = beam.N * beam.M
     uniquev = set()
-    for fl in [datafiles[x] for x in thiscase]:
+
+    for fl in ['/mnt/fastdata/Data/spine360/by-Beam/twolists'+ str(2*x) + '.pickle' for x in thiscase]:
         newvcps = []
         newbcps = []
         newdcps = []
-        print(fl)
         counter += 1
-        print('reading datafile:', counter,fl)
+        print('reading datafile:', counter, ' out of ', len(thiscase), fl)
         input = open(fl, 'rb')
         indices, doses = pickle.load(input)
         input.close()
-        for k in indices.keys():
+        for k in indices.keys(): # k here represents the voxel that we are analyzing
             for m in myranges:
                 if k in m:
                     newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
@@ -392,7 +376,7 @@ def getDmatrixPiecesMemorySaving():
         initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
         # Transform the space of beamlets to the new coordinate system starting from zero
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
-        #beamletList[thisbeam].star
+        print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
         beamDs[thisbeam] = sparse.csr_matrix((newdcps, (newvcps, newbcps)), shape=(voxel.numVoxels, bpb), dtype=float)
         del newdcps
         del newbcps
@@ -492,6 +476,7 @@ def fvalidbeamlets(index):
 def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw):
     # Get the slice of the matrix that I need
     if memorySaving:
+        print('going to read slice for aperture: ', thisApertureIndex)
         D = data.DlistT[thisApertureIndex].transpose()
     else:
         D = DmatBig[beamList[thisApertureIndex].StartBeamletIndex:(beamList[thisApertureIndex].EndBeamletIndex + 1),]
@@ -720,6 +705,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw):
     if __name__ == '__main__':
         pool = Pool(processes = numcores)              # process per MP
         locstotest = data.notinC.loc
+        print('loctotest: ', locstotest)
         if debugmode:
             locstotest = data.notinC.loc[0:numcores]
         respool = pool.map(partialparsubpp, locstotest)
@@ -933,6 +919,7 @@ def column_generation(C):
     else:
         rangenumbeams = range(beam.numBeams)
     for j in rangenumbeams:
+        print('inserting angle', beamList[j].angle, 'at index', beamList[j].location, )
         data.notinC.insertAngle(beamList[j].location, beamList[j].angle)
 
     plotcounter = 0
