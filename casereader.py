@@ -1151,7 +1151,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.0
+CValue = 0.0001
 finalintensities = column_generation(CValue)
 averageNW = 0.0
 averageW = 0.0
@@ -1161,7 +1161,7 @@ for i in range(beam.numBeams):
 
 print('averageW:', averageW/beam.numBeams)
 print('averageNW:', averageNW/beam.numBeams)
-PIK = "outputGraphics/allbeamshapes-" + str(C) + "-save.pickle"
+PIK = "outputGraphics/allbeamshapes-" + "-save4.pickle"
 with open(PIK, "wb") as f:
     pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
 f.close()
