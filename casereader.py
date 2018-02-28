@@ -27,7 +27,7 @@ numcores   = 8
 testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -931,8 +931,6 @@ def column_generation(C):
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
         print('pstar0', pstarlist[0], bestApertureIndexlist[0])
-        if 136 ==  bestApertureIndexlist[0]:
-            print('stop here for a second')
         if pstarlist[0] >= 0:
             #This choice includes the case when no aperture was selected
             print('Program finishes because no aperture was selected to enter')
@@ -985,6 +983,10 @@ def column_generation(C):
         print('caligraphicC:', data.caligraphicC.angle)
         print('notinC: ', data.notinC.angle)
     # Set up an order to go refining one by one.
+    PIK = "outputGraphics/allbeamshapesbefore-save-" + str(C) + ".pickle"
+    with open(PIK, "wb") as f:
+        pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
+    f.close()
     if refinementloops:
         refinementLoopCounter = 0
         while refinementLoopCounter < 10:
@@ -996,7 +998,7 @@ def column_generation(C):
                 contributionsPengList.append(contributionofBeam(mynumbeam, oldObjectiveValue, C, C2, C3, vmax, beamletwidth))
             # pengList will contain a list of the different apertures in decreasing order of contribution
             print('Contributions PengList. This one is not ordered:', contributionsPengList)
-            pengList = [x for _, x in sorted(zip(contributionsPengList, rangenumbeams), key=lambda pair: pair[0], reverse=True)]
+            pengList = [x for _, x in sorted(zip(contributionsPengList, rangenumbeams), key=lambda pair: pair[0], reverse=False)]
             print('pengList ordenada: ', pengList)
             for refaper in pengList:
                 print('rechecking aperture:', refaper)
@@ -1151,7 +1153,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.0001
+CValue = 1E-7
 finalintensities = column_generation(CValue)
 averageNW = 0.0
 averageW = 0.0
@@ -1161,7 +1163,7 @@ for i in range(beam.numBeams):
 
 print('averageW:', averageW/beam.numBeams)
 print('averageNW:', averageNW/beam.numBeams)
-PIK = "outputGraphics/allbeamshapes-" + "-save4.pickle"
+PIK = "outputGraphics/allbeamshapes-save-"+ str(CValue) + ".pickle"
 with open(PIK, "wb") as f:
     pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
 f.close()
