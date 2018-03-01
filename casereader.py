@@ -572,13 +572,13 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = weight
             # dadnetwork and mnetwork don't need to be changed here for obvious reasons
     posBeginningOfRow += nodesinpreviouslevel
-    leftmostleaf = 14 * K - 1 # Position in python position(-1) of the leftmost leaf
+    leftmostleaf = 14 - 1 # Position in python position(-1) of the leftmost leaf
     # Then handle the calculations for the m rows. Nodes that are neither source nor sink.
     for m in range(1,M):
         oldflag = nodesinpreviouslevel
         nodesinpreviouslevel = 0
         # And now process normally checking against valid beamlets
-        leftrange = range(roundceil(max(beam.leftEdgeFract, lcm[m] - vmaxm * (angdistancem/speedlim)/bw , lcp[m] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw )), 1/K)
+        leftrange = np.arange(roundceil(max(beam.leftEdgeFract, lcm[m] - vmaxm * (angdistancem/speedlim)/bw , lcp[m] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw )), 1/K)
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
@@ -600,6 +600,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
                 possiblebeamletsthisrow = range(int(np.ceil(l)) + leftmostleaf, int(np.floor(r) + leftmostleaf))#
                 DoseSide = -((np.ceil(l) - (l)) * beamGrad[int(np.floor(l))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
                 if(len(possiblebeamletsthisrow) > 0):
+                    #print(possiblebeamletsthisrow)
                     Dose = -beamGrad[possiblebeamletsthisrow].sum()
                     C3simplifier = C3 * b * (r - l)
                 else:
@@ -616,7 +617,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
         posBeginningOfRow = nodesinpreviouslevel + posBeginningOfRow # This is the total number of network nodes
         # Keep the location of the leftmost leaf
-        leftmostleaf = 14 * K + leftmostleaf
+        leftmostleaf = 14 + leftmostleaf
     # thisnode gets augmented only 1 because only the sink node will be added
     thisnode += 1
 
@@ -763,6 +764,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
             Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
             Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
         Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
+        print(Perimeter, Area)
         Kellymeasure = Perimeter / Area
         pstarlist.append(pstar)
         llist.append(l)
@@ -771,7 +773,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
         Kellymeasurelist.append(Kellymeasure)
         PerimeterList.append(Perimeter)
         AreaList.append(Area)
-        goodaperturessent +=1
+        goodaperturessent += 1
     return(pstarlist, llist, rlist, bestApertureIndexlist, Kellymeasurelist, goodaperturessent, PerimeterList, AreaList)
 
 ## This function returns the set of available AND open beamlets for the selected aperture (i).
