@@ -87,6 +87,11 @@ class beam(object):
     numBeams = 0
     M = 8
     N = 14
+    # Initialize left and right leaf limits for all
+    leftEdge = -1
+    rightEdge = 14
+    leftEdgeFract = None
+    rightEdgeFract = None
     JawX1 = None
     JawX2 = None
     JawY1 = None
@@ -105,9 +110,6 @@ class beam(object):
         self.EndBeamletIndex = sthing.EndBeamletIndex
         self.beamletsPerBeam = self.EndBeamletIndex - self.StartBeamletIndex
         self.beamletsInBeam = self.beamletsPerBeam
-        # Initialize left and right leaf limits for all
-        self.leftEdge = -1
-        self.rightEdge = 14
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
@@ -528,15 +530,21 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     wnetwork = np.empty(networkNodesNumber, dtype = np.float) # Weight Vector initialized with +\infty
     wnetwork[:] = np.inf
     dadnetwork = np.zeros(networkNodesNumber, dtype = np.int) # Dad Vector. Where Dad is the combination of (l,r) in previous row
+    # These subfunctions help round to the nearest multiple of 1/K
+    def roundceil(x):
+        return(math.ceil(x * K) / K)
+    def roundfloor(x):
+        return(math.floor(x * K) / K)
     # Work on the first row perimeter and area values
-    leftrange = range(math.ceil(max(leftEdge, lcm[0] - vmaxm * (angdistancem/speedlim)/bw , lcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, lcm[0] + vmaxm * (angdistancem/speedlim)/bw , lcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
+    # -1/K means that the left edge is completely open
+    leftrange = np.arange(roundceil(max(beam.leftEdgeFract, lcm[0] - vmaxm * (angdistancem/speedlim)/bw , lcp[0] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[0] + vmaxm * (angdistancem/speedlim)/bw , lcp[0] + vmaxp * (angdistancep/speedlim)/bw )), 1/K)
     # Check if unfeasible. If it is then assign one value but tell the result to the person running this
     if (0 == len(leftrange)):
         midpoint = (angdistancep * lcm[0] + angdistancem * lcp[0])/(angdistancep + angdistancem)
         leftrange = np.arange(midpoint, midpoint + 1)
         ##print('constraint leftrange at level ' + str(0) + ' aperture ' + str(thisApertureIndex) + ' could not be met', 'ERROR Report: lcm[0], angdistancem, lcp[0], angdistancep', lcm[0], angdistancem, lcp[0], angdistancep, '\nFull left limits, lcp, lcm:', lcp, lcm, 'm: ', 0, 'predecesor: ', predec, 'succesor: ', succ)
     for l in leftrange:
-        rightrange = range(math.ceil(max(l + 1, rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )))
+        rightrange = np.arange(roundceil(max(l + (1/K), rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw )), 1/K)
         if (0 == len(rightrange)):
             midpoint = (angdistancep * rcm[0] + angdistancem * rcp[0])/(angdistancep + angdistancem)
             rightrange = np.arange(midpoint, midpoint + 1)
@@ -545,11 +553,11 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             thisnode += 1
             nodesinpreviouslevel += 1
             # First I have to make sure to add the beamlets that I am interested in
-            if(l + 1 < r): # prints r numbers starting from l + 1. So range(3,4) = 3
+            if(l + (1 / K) < r): # prints r numbers starting from l + 1. So range(3,4) = 3
                 ## Take integral pieces of the dose component
-                possiblebeamletsthisrow = range(int(np.ceil(l+1)),int(np.floor(r)))
+                possiblebeamletsthisrow = range(int(np.ceil(l)),int(np.floor(r)))
                 ## Calculate dose on the sides, the fractional component
-                DoseSide = -((np.ceil(l+1) - (l+1)) * beamGrad[int(np.floor(l+1))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
+                DoseSide = -((np.ceil(l) - (l)) * beamGrad[int(np.floor(l))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
                 if (len(possiblebeamletsthisrow) > 0):
                     Dose = -beamGrad[ possiblebeamletsthisrow ].sum()
                     weight = C * ( C2 * (r - l) - C3 * b * (r - l)) - Dose + 10E-10 * (r-l) + DoseSide# The last term in order to prefer apertures opening in the center
@@ -564,23 +572,21 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = weight
             # dadnetwork and mnetwork don't need to be changed here for obvious reasons
     posBeginningOfRow += nodesinpreviouslevel
-    leftmostleaf = 14 - 1 # Position in python position(-1) of the leftmost leaf
+    leftmostleaf = 14 * K - 1 # Position in python position(-1) of the leftmost leaf
     # Then handle the calculations for the m rows. Nodes that are neither source nor sink.
     for m in range(1,M):
         oldflag = nodesinpreviouslevel
         nodesinpreviouslevel = 0
         # And now process normally checking against valid beamlets
-        leftrange = range(math.ceil(max(leftEdge, lcm[m] - vmaxm * (angdistancem/speedlim)/bw , lcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge - 1, lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
+        leftrange = range(roundceil(max(beam.leftEdgeFract, lcm[m] - vmaxm * (angdistancem/speedlim)/bw , lcp[m] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw )), 1/K)
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
-            rightrange = range(math.ceil(max(l + 1, rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), 1 + math.floor(min(rightEdge, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )))
+            rightrange = np.arange(roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw )), 1 / K)
             if (0 == len(rightrange)):
-                print(rightrange)
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
-                print(angdistancep, angdistancem, lcm[m], lcp[m], midpoint)
                 rightrange = np.arange(midpoint, midpoint + 1)
             for r in rightrange:
                 nodesinpreviouslevel += 1
@@ -591,8 +597,8 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
                 mnetwork[thisnode] = m
                 wnetwork[thisnode] = np.inf
                 # Select only those beamlets that are possible in between the (l,r) limits.
-                possiblebeamletsthisrow = range(int(np.ceil(l+1)) + leftmostleaf, int(np.floor(r) + leftmostleaf))#
-                DoseSide = -((np.ceil(l+1) - (l+1)) * beamGrad[int(np.floor(l+1))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
+                possiblebeamletsthisrow = range(int(np.ceil(l)) + leftmostleaf, int(np.floor(r) + leftmostleaf))#
+                DoseSide = -((np.ceil(l) - (l)) * beamGrad[int(np.floor(l))] + (r - np.floor(r)) * beamGrad[int(np.ceil(r))])
                 if(len(possiblebeamletsthisrow) > 0):
                     Dose = -beamGrad[possiblebeamletsthisrow].sum()
                     C3simplifier = C3 * b * (r - l)
@@ -610,7 +616,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
         posBeginningOfRow = nodesinpreviouslevel + posBeginningOfRow # This is the total number of network nodes
         # Keep the location of the leftmost leaf
-        leftmostleaf = 14 + leftmostleaf
+        leftmostleaf = 14 * K + leftmostleaf
     # thisnode gets augmented only 1 because only the sink node will be added
     thisnode += 1
 
@@ -620,7 +626,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = wnetwork[mynode] + weight
             dadnetwork[thisnode] = mynode
             p = wnetwork[thisnode]
-    thenode = thisnode # WILMER take a look at this
+    thenode = thisnode
     l = []
     r = []
     while(1):
@@ -915,6 +921,8 @@ def column_generation(C, K):
     ## Maximum intensity
     data.YU = data.RU / data.speedlim
     beamletwidth = 1.0
+    beam.leftEdgeFract = beam.leftEdge + (K - 1) / K
+    beam.rightEdgeFract = beam.rightEdge - (K - 1) / K
 
     #Step 0 on Fei's paper. Set C = empty and zbar = 0. The gradient of numbeams dimensions generated here will not
     # be used, and therefore is nothing to worry about.
