@@ -338,6 +338,7 @@ def getDmatrixPieces():
     return(newvcps, newbcps, newdcps)
 
 #----------------------------------------------------------------------------------------
+
 ## Get the point to dose data in a list of sparse matrices
 def getDmatrixPiecesMemorySaving():
     ## Initialize vectors for voxel component, beamlet component and dose
@@ -386,9 +387,7 @@ def getDmatrixPiecesMemorySaving():
         del newbcps
         del newvcps
         gc.collect()
-
     return(beamDs, uniquev)
-
 #------------------------------------------------------------------------------------------------------------------
 class problemData(object):
     def __init__(self, numberbeams):
@@ -530,8 +529,8 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     bpr = K * (rightEdge - leftEdge + 2) # the ones inside plus two edges
     networkNodesNumber = bpr * bpr + M * bpr * bpr + bpr * bpr # An overestimate of the network nodes in this network
     # Initialization of network vectors. This used to be a list before
-    lnetwork = np.zeros(networkNodesNumber, dtype = np.float16) #left limit vector
-    rnetwork = np.zeros(networkNodesNumber, dtype = np.float16) #right limit vector
+    lnetwork = np.zeros(networkNodesNumber, dtype = np.float32) #left limit vector
+    rnetwork = np.zeros(networkNodesNumber, dtype = np.float32) #right limit vector
     mnetwork = np.ones(networkNodesNumber, dtype = np.int) #Only to save some time in the first loop
     wnetwork = np.empty(networkNodesNumber, dtype = np.float) # Weight Vector initialized with +\infty
     wnetwork[:] = np.inf
@@ -790,6 +789,9 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
 #         diagmaker. A vector that has a 1 in each position where an openaperturebeamlet is available.
 # openaperturenp is read as openapertureMaps. A member of the VMAT_CLASS.
 def updateOpenAperture(i):
+    print('updating aperture', i)
+    if 90 == i:
+        pass
     leftlimits = 0
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
@@ -804,7 +806,7 @@ def updateOpenAperture(i):
         ## Notice that indleft and indright below may be floats instead of just integers
         if (beamList[i].llist[m] >= min(validbeamlets) - 1):
             ## I subtract min validbeamlets bec. I want to find coordinates in available space
-            ## indleft is where the edge of the left leaf ends. From there on there are photons.
+            ## indleft is where the edge of the left leaf ends. From there on to the right, there are photons.
             indleft = beamList[i].llist[m] + leftlimits - min(validbeamlets)
         else:
             # if the left limit is too far away to the left, just take what's available
@@ -820,12 +822,10 @@ def updateOpenAperture(i):
             else:
                 # Right limit is to the left of validbeamlets (This situation is weird)
                 indright = 0
-
-        # Keep the location of the leftmost leaf
-        leftlimits += len(validbeamlets)
-        if (np.floor(indleft) < np.ceil(indright) - 1): ## Make sure the thing opened at all.
+        if (indleft < indright): ## Make sure the thing opened at all.
             first = True
-            for thisbeamlet in range(int(np.floor(indleft)) + 1, int(np.ceil(indright))):
+            #Everything should be included
+            for thisbeamlet in range(int(np.floor(indleft)), int(np.ceil(indright))):
                 strength = 1.0
                 if first:
                     first = False
@@ -836,7 +836,7 @@ def updateOpenAperture(i):
                 openaperture.append(thisbeamlet)
             ## Fix the proportion of the right beamlet that is open.
             strength = indright - np.floor(indright)
-            if strength > 0.01:
+            if strength > 0.001: # this is here to make sure that right - floor(right) is not zero when right is integer
                 ## Important: There is no need to check if there exists a last element because after all, you already
                 # checked whe you entered the if loop above this one
                 openapertureStrength[-1] = strength
@@ -846,7 +846,9 @@ def updateOpenAperture(i):
             if 1 == int(np.ceil(indright)) - int(np.floor(indleft)):
                 strength = indright - indleft
                 openapertureStrength[-1] = strength
-                diagmaker[int(np.ceil(indright)) -1] = strength
+                diagmaker[int(np.floor(indright))] = strength
+        # Keep the location of the leftmost leaf
+        leftlimits += len(validbeamlets)
     openaperturenp = np.array(openaperture, dtype=int) #Contains indices of open beamlets in the aperture
     return(openaperturenp, diagmaker, openapertureStrength)
 
