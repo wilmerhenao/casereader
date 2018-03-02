@@ -24,10 +24,10 @@ undercoeff =              [  0.0,    0.0,    0.0, 2E-2,   0.0 ]
 overcoeff  =              [10E-5,  10E-7,   6E-3, 9E-3,  5E-4 ]
 structureListRestricted = [    4,      8,      1,    7,     0 ]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 30)]
+testcase   = [i for i in range(0, 180, 20)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -480,10 +480,8 @@ def fvalidbeamlets(index):
 # thisApertureIndex = index location in the set of apertures that I have saved.
 # K = Number of times that I will artificially split each interval
 def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K):
+    print('this aperture index:', thisApertureIndex)
     # Get the slice of the matrix that I need
-    print('thisApertureIndex', thisApertureIndex)
-    if 60 == thisApertureIndex:
-        pass
     if memorySaving:
         D = data.DlistT[thisApertureIndex].transpose()
     else:
@@ -705,9 +703,11 @@ def chooseSmallest(locallocation, listinorder, degreesapart):
                 if min(np.absolute([min(abs(data.notinC(candidate) - data.caligraphicC(apsin)), abs(360 - abs(data.notinC(candidate) - data.caligraphicC(apsin)))) for apsin in data.caligraphicC.loc])) > degreesapart:
                     chosenlocs.append(candidate)
                     lllist.append(locallocation[i])
-                    degreesapart *= 2
                 if degreesapart > 180:
                     return(lllist)
+            else:
+                chosenlocs.append(candidate)
+                lllist.append(locallocation[i])
     return(lllist)
 
 def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
@@ -733,7 +733,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
     # Choose only pvalues that are negative to be selected to enter
     negpvalues = max(1, sum([1 for i in pvalues if i < 0]))
     ## Choose entering candidates making sure that there are at least 10 degrees of separation
-    indstars = chooseSmallest(respoolinorder[:negpvalues], listinorder[:negpvalues], 10) #This 10 is the degrees of separation
+    indstars = chooseSmallest(respoolinorder[:negpvalues], listinorder[:negpvalues], 41) #This 10 is the degrees of separation
     # Initialize the lists that I'm going to return
     pstarlist = []
     llist = []
@@ -1171,7 +1171,10 @@ for s in data.structureIndexUsed:
 print(structureNames)
 
 CValue = 1E-7
-finalintensities = column_generation(CValue, 5) # Second argument here determines how many times I will cut each beamlet artificially
+if debugmode:
+    finalintensities = column_generation(CValue, 1)
+else:
+    finalintensities = column_generation(CValue, 5) # Second argument here determines how many times I will cut each beamlet artificially
 averageNW = 0.0
 averageW = 0.0
 for i in range(beam.numBeams):
