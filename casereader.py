@@ -430,6 +430,9 @@ class problemData(object):
         self.dZdK = np.matrix(np.zeros((voxel.numVoxels, beam.numBeams)))
         if self.caligraphicC.len() != 0:
             for i in self.caligraphicC.loc:
+                print('What could go wrong')
+                print(i)
+                print('openApertureMaps', self.openApertureMaps[i])
                 self.currentDose += self.DlistT[i][:,self.openApertureMaps[i]] * sparse.diags(self.strengths[i]) * np.repeat(self.currentIntensities[i], len(self.openApertureMaps[i]), axis = 0)
                 self.dZdK[:,i] = (self.DlistT[i] * sparse.diags(self.diagmakers[i], 0)).sum(axis=1)
 
@@ -482,6 +485,9 @@ def fvalidbeamlets(index):
 # K = Number of times that I will artificially split each interval
 def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K):
     # Get the slice of the matrix that I need
+    print('thisApertureIndex', thisApertureIndex)
+    if 60 == thisApertureIndex:
+        pass
     if memorySaving:
         D = data.DlistT[thisApertureIndex].transpose()
     else:
@@ -524,8 +530,8 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     bpr = K * (rightEdge - leftEdge + 2) # the ones inside plus two edges
     networkNodesNumber = bpr * bpr + M * bpr * bpr + bpr * bpr # An overestimate of the network nodes in this network
     # Initialization of network vectors. This used to be a list before
-    lnetwork = np.zeros(networkNodesNumber, dtype = np.int) #left limit vector
-    rnetwork = np.zeros(networkNodesNumber, dtype = np.int) #right limit vector
+    lnetwork = np.zeros(networkNodesNumber, dtype = np.float16) #left limit vector
+    rnetwork = np.zeros(networkNodesNumber, dtype = np.float16) #right limit vector
     mnetwork = np.ones(networkNodesNumber, dtype = np.int) #Only to save some time in the first loop
     wnetwork = np.empty(networkNodesNumber, dtype = np.float) # Weight Vector initialized with +\infty
     wnetwork[:] = np.inf
@@ -916,7 +922,7 @@ def column_generation(C, K):
     vmaxincmspersecond = 3.25 # 3.25 cms per second
     data.speedlim = 0.85  # Values are in the VMATc paper page 2955. 0.85 < s < 6. This is in degrees per second
     secondsbetweenbeams = data.distancebetweenbeams / data.speedlim # seconds per beam interval
-    cushion = 0.1
+    cushion = 50.1
     vmax = vmaxincmspersecond * secondsbetweenbeams + cushion
     ## Maximum Dose Rate
     data.RU = 20.0
