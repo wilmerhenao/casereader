@@ -27,7 +27,7 @@ numcores   = 8
 testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = True
+debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -429,9 +429,6 @@ class problemData(object):
         self.dZdK = np.matrix(np.zeros((voxel.numVoxels, beam.numBeams)))
         if self.caligraphicC.len() != 0:
             for i in self.caligraphicC.loc:
-                print('What could go wrong')
-                print(i)
-                print('openApertureMaps', self.openApertureMaps[i])
                 self.currentDose += self.DlistT[i][:,self.openApertureMaps[i]] * sparse.diags(self.strengths[i]) * np.repeat(self.currentIntensities[i], len(self.openApertureMaps[i]), axis = 0)
                 self.dZdK[:,i] = (self.DlistT[i] * sparse.diags(self.diagmakers[i], 0)).sum(axis=1)
 
@@ -789,9 +786,6 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
 #         diagmaker. A vector that has a 1 in each position where an openaperturebeamlet is available.
 # openaperturenp is read as openapertureMaps. A member of the VMAT_CLASS.
 def updateOpenAperture(i):
-    print('updating aperture', i)
-    if 90 == i:
-        pass
     leftlimits = 0
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
