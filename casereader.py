@@ -19,15 +19,15 @@ import pickle
 structureListRestricted = [    4,      8,      1,    7,     0 ]
 #limits                   [   27,     30,     24,36-47,    22 ]
                          #[esoph,trachea,cordprv,  ptv,  cord ]
-threshold  =              [    5,     10,      5,   38,     5 ]
-undercoeff =              [  0.0,    0.0,    0.0, 2E-2,   0.0 ]
-overcoeff  =              [10E-5,  10E-7,   6E-3, 9E-3,  5E-4 ]
+threshold  =              [    5,     10,      5,   40,     5 ]
+undercoeff =              [  0.0,    0.0,    0.0, 6E-2,   0.0 ]
+overcoeff  =              [1E-4,  10E-5,   5E-4, 4E-5,  6E-4 ]
 structureListRestricted = [    4,      8,      1,    7,     0 ]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 20)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = True
+debugmode = False
 easyread = True
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -113,6 +113,8 @@ class beam(object):
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
+        self.Perimeter = 0
+        self.Area = 0
         beam.numBeams += 1
 
 class voxel(object):
@@ -871,7 +873,6 @@ def solveRMC(YU):
     return(res)
 
 def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
-    print('rechecking aperture:', refaper)
     # Remove aperture from the set temporarily
     # Check if it's in caligraphicC or not
     itwasinCaligraphicC = False
@@ -891,10 +892,14 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
     if itwasinCaligraphicC:
         data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
         data.notinC.removeIndex(bestApertureIndex)
+        data.calcDose()
+        data.calcGradientandObjValue()
     # If the new aperture is not good, don't waste more time and return 0
     if pstar > 0:
-            return(0)
+        print('p star > 0')
+        return(0)
     else:
+        print('p star < 0')
         # Solve the instance of the RMP associated with caligraphicC. But make sure to put everything back to the values
         # where it was before
         lmsave = beamList[bestApertureIndex].llist
@@ -910,15 +915,15 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
     return(data.rmpres.fun - oldobj)
 
 def column_generation(C, K):
-    C2 = 1.0
-    C3 = 1.0
+    C2 = 1/3
+    C3 = 1/4
     #eliminationThreshold = 0.1 Wilmer:This one worked really Well
     eliminationThreshold = 0.3
     ## Maximum leaf speed
     vmaxincmspersecond = 3.25 # 3.25 cms per second
     data.speedlim = 0.85  # Values are in the VMATc paper page 2955. 0.85 < s < 6. This is in degrees per second
     secondsbetweenbeams = data.distancebetweenbeams / data.speedlim # seconds per beam interval
-    cushion = 50.1
+    cushion = 0.1
     vmax = vmaxincmspersecond * secondsbetweenbeams + cushion
     ## Maximum Dose Rate
     data.RU = 20.0
@@ -967,6 +972,8 @@ def column_generation(C, K):
                 beamList[bestApertureIndex].llist = lm
                 beamList[bestApertureIndex].rlist = rm
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
+                beamList[bestApertureIndex].Perimeter = Perimeter
+                beamList[bestApertureIndex].Area = Area
                 allbeamshapes.append((lm, rm, kmeasure, Perimeter, Area))
                 # Precalculate the aperture map to save times.
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
@@ -1039,6 +1046,8 @@ def column_generation(C, K):
                 beamList[bestApertureIndex].rlist = rm
                 allbeamshapes.append((lm, rm, kmeasure, perimeter, area))
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
+                beamList[bestApertureIndex].Perimeter = perimeter
+                beamList[bestApertureIndex].Area = area
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
                 data.rmpres = solveRMC(data.YU)
@@ -1047,7 +1056,7 @@ def column_generation(C, K):
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
             print('caligraphicC:', data.caligraphicC.angle)
             print('notinC: ', data.notinC.angle)
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.000001:
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.0000001:
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
@@ -1170,7 +1179,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 1E-7
+CValue = 0.0
 if debugmode:
     finalintensities = column_generation(CValue, 1)
 else:
@@ -1186,5 +1195,9 @@ print('averageNW:', averageNW/beam.numBeams)
 PIK = "outputGraphics/allbeamshapes-save-"+ str(CValue) + ".pickle"
 with open(PIK, "wb") as f:
     pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
+f.close()
+PIK = "outputGraphics/beamList-save-"+ str(CValue) + ".pickle"
+with open(PIK, "wb") as f:
+    pickle.dump(beamList, f, pickle.HIGHEST_PROTOCOL)
 f.close()
 sys.exit()
