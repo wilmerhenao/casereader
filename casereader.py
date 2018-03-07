@@ -1,4 +1,4 @@
-#! /opt/intel/intelpython35/bin/python3.5
+#!/opt/intel/intelpython3/bin/python3.6
 import dose_to_points_data_pb2
 import sys
 import os
@@ -14,17 +14,20 @@ import math
 import pylab
 import matplotlib.pyplot as plt
 import pickle
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 # List of organs that will be used# List of organs that will be used
 structureListRestricted = [    4,      8,      1,    7,     0 ]
 #limits                   [   27,     30,     24,36-47,    22 ]
                          #[esoph,trachea,cordprv,  ptv,  cord ]
-threshold  =              [    5,     10,      5,   40,     5 ]
-undercoeff =              [  0.0,    0.0,    0.0, 6E-2,   0.0 ]
-overcoeff  =              [1E-4,  10E-5,   5E-4, 4E-5,  6E-4 ]
+threshold  =              [   10,     10,      5,   39,     5 ]
+undercoeff =              [  0.0,    0.0,    0.0, 9E-4,   0.0 ]
+overcoeff  =              [1E-6,  1E-6,   2E-5,   6E-4,  2E-5 ]
+#overcoeff  =              [1E-7,  1E-7,   2E-3,   6E-2,  3E-3 ]
 structureListRestricted = [    4,      8,      1,    7,     0 ]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 20)]
+testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
@@ -1056,7 +1059,7 @@ def column_generation(C, K):
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
             print('caligraphicC:', data.caligraphicC.angle)
             print('notinC: ', data.notinC.angle)
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.0000001:
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.00001:
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
@@ -1111,7 +1114,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     plt.ylabel('Fractional Volume')
     plt.title('Number of Beams: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
-    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMAT' + str(Cvalue) + str(iterationNumber) + '.png')
+    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMATLight' + str(Cvalue) + str(iterationNumber) + '.png')
     plt.close()
 
 def plotApertures(C):
@@ -1144,6 +1147,46 @@ def plotApertures(C):
         plt.axis('off')
     fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
     plt.close()
+    
+def plotAperturesBug(C):
+    magnifier = 50
+    ## Plotting apertures
+    xcoor = math.ceil(math.sqrt(beam.numBeams))
+    ycoor = math.ceil(math.sqrt(beam.numBeams))
+    xcoor = 3
+    ycoor = 4
+    nrows, ncols = beam.M, beam.N
+    print('numbeams', beam.numBeams)
+    pp = PdfPages(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.pdf')
+    for mynumbeam in range(0, beam.numBeams):
+        position = mynumbeam % (xcoor * ycoor)
+        lmag = beamList[mynumbeam].llist
+        rmag = beamList[mynumbeam].rlist
+        ## Convert the limits to hundreds.
+        for posn in range(0, len(lmag)):
+            lmag[posn] = int(magnifier * lmag[posn])
+            rmag[posn] = int(magnifier * rmag[posn])
+        image = -1 * np.ones(magnifier * nrows * ncols)
+            # Reshape things into a 9x9 grid
+        image = image.reshape((nrows, magnifier * ncols))
+        for i in range(0, beam.M):
+            image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam] #intensity assignment
+        image = np.repeat(image, 7*magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
+        image[0,0] = data.YU # In order to get the right list of colors
+        # Set up a location where to save the figure
+        fig = plt.figure(1)
+        plt.subplot(ycoor,xcoor, position + 1)
+        cmapper = plt.get_cmap("autumn_r")
+        cmapper.set_under('black', 1.0)
+        plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
+        plt.axis('off')
+        if position == xcoor * ycoor -1:
+            print('had to do it')
+            pp.savefig()
+            plt.close()
+    pp.close()
+    #fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
+
 
 start = time.time()
 data = problemData(numbeams)
@@ -1179,9 +1222,9 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.0
+CValue = 10.0
 if debugmode:
-    finalintensities = column_generation(CValue, 1)
+    finalintensities = column_generation(CValue, 5)
 else:
     finalintensities = column_generation(CValue, 5) # Second argument here determines how many times I will cut each beamlet artificially
 averageNW = 0.0
