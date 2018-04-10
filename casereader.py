@@ -4,7 +4,7 @@ import sys
 import os
 import time
 import gc
-import numpy as np
+import numpy as nps
 from scipy import sparse
 from scipy.optimize import minimize
 from multiprocessing import Pool
@@ -16,16 +16,14 @@ import matplotlib.pyplot as plt
 import pickle
 from matplotlib.backends.backend_pdf import PdfPages
 
-
 # List of organs that will be used# List of organs that will be used
-structureListRestricted = [    4,      8,      1,    7,     0 ]
-#limits                   [   27,     30,     24,36-47,    22 ]
-                         #[esoph,trachea,cordprv,  ptv,  cord ]
-threshold  =              [   10,     10,      5,   39,     5 ]
-undercoeff =              [  0.0,    0.0,    0.0, 9E-4,   0.0 ]
-overcoeff  =              [1E-6,  1E-6,   2E-5,   6E-4,  2E-5 ]
-#overcoeff  =              [1E-7,  1E-7,   2E-3,   6E-2,  3E-3 ]
-structureListRestricted = [    4,      8,      1,    7,     0 ]
+structureListRestricted = [          4,            8,               1,           7,           0 ]
+#limits                   [         27,           30,              24,       36-47,          22 ]
+                               #[esoph,     trachea,         cordprv,         ptv,         cord ]
+threshold  =              [         10,           10,               5,          39,           5 ]
+undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E-2,         0.0 ]
+overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-2, 3015 * 2E-3 ]
+structureListRestricted = [          4,            8,               1,           7,           0 ]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 30)]
 fullcase   = [i for i in range(180)]
@@ -47,9 +45,9 @@ elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
     cutter = 51
-#elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
-#    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
-#    dropbox = "/home/wilmer/Dropbox"
+elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
+    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
+    dropbox = "/home/wilmer/Dropbox"
 else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
@@ -76,13 +74,14 @@ class structure(object):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
-            self.threshold = 42
-            self.overdoseCoeff = 0.0000001
-            self.underdoseCoeff = 1000.0
+            # NEVER CHANGE THIS! YOU MIGHT HAVE TROUBLE LATER
+            self.threshold = 0.0
+            self.overdoseCoeff = 0.0
+            self.underdoseCoeff = 0.0
         else:
             structure.numOARs += 1
             self.threshold = 0.0
-            self.overdoseCoeff = 0.000001
+            self.overdoseCoeff = 0.0
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
@@ -425,8 +424,8 @@ class problemData(object):
         for i in range(voxel.numVoxels):
             sid = structureDict[vList[i].StructureId] # Find structure of this particular voxel
             self.quadHelperThresh[i] = sList[sid].threshold
-            self.quadHelperOver[i] = sList[sid].overdoseCoeff
-            self.quadHelperUnder[i] = sList[sid].underdoseCoeff
+            self.quadHelperOver[i] = sList[sid].overdoseCoeff / sList[sid].Size
+            self.quadHelperUnder[i] = sList[sid].underdoseCoeff / sList[sid].Size
             self.maskValue[i] = 2**sid
 
     def calcDose(self):
@@ -448,14 +447,13 @@ class problemData(object):
         uDoseObjCl = (uDoseObj > 0) * uDoseObj
         uDoseObj = (uDoseObj > 0) * uDoseObj
         uDoseObj = uDoseObj * uDoseObj * self.quadHelperUnder
-
-        self.objectiveValue = sum(oDoseObj + uDoseObj)
-
         oDoseObjGl = 2 * oDoseObjCl * self.quadHelperOver
         uDoseObjGl = 2 * uDoseObjCl * self.quadHelperUnder
         # Notice that I use two types of gradients. One for voxels and one for apertures
         self.voxelgradient = 2 * (oDoseObjGl - uDoseObjGl)
         self.aperturegradient = (np.asmatrix(self.voxelgradient) * self.dZdK).transpose()
+        self.objectiveValue = sum(oDoseObj + uDoseObj)
+
 
 ## Find geographical location of the ith row in aperture index given by index. This is really only a problem for the
 # HN case from the CORT database
@@ -857,7 +855,7 @@ def calcObjGrad(x, user_data = None):
     data.calcGradientandObjValue()
     return(data.objectiveValue, data.aperturegradient)
 
-def solveRMC(YU):
+def solveRMC(YU, mymaxiter = 20):
     start = time.time()
     numbe = data.caligraphicC.len()
 
@@ -869,8 +867,7 @@ def solveRMC(YU):
             boundschoice.append((0, YU))
         else:
             boundschoice.append((0, 0))
-    print(len(data.currentIntensities), len(boundschoice))
-    res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds = boundschoice, options={'ftol':1e-1, 'disp':5,'maxiter':200})
+    res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds = boundschoice, tol = 0.1)#, options={'ftol':10e-1, 'disp':5,'maxfun':mymaxiter})
 
     print('Restricted Master Problem solved in ' + str(time.time() - start) + ' seconds')
     return(res)
@@ -911,7 +908,7 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
         beamList[bestApertureIndex].rlist = rm
         # Precalculate the aperture map to save times.
         data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-        data.rmpres = solveRMC(data.YU)
+        data.rmpres = solveRMC(data.YU, 5)
         beamList[bestApertureIndex].llist = lmsave
         beamList[bestApertureIndex].rlist = rmsave
         data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
@@ -980,7 +977,7 @@ def column_generation(C, K):
                 allbeamshapes.append((lm, rm, kmeasure, Perimeter, Area))
                 # Precalculate the aperture map to save times.
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-            data.rmpres = solveRMC(data.YU)
+            data.rmpres = solveRMC(data.YU, 10)
             print('Solved Restricted Master Problem')
             ## List of apertures that was removed in this iteration
             IndApRemovedThisStep = []
@@ -1053,33 +1050,44 @@ def column_generation(C, K):
                 beamList[bestApertureIndex].Area = area
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-                data.rmpres = solveRMC(data.YU)
+                data.rmpres = solveRMC(data.YU, 100)
                 printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
             print("Let's see round of refinement", refinementLoopCounter)
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
             print('caligraphicC:', data.caligraphicC.angle)
             print('notinC: ', data.notinC.angle)
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.00001:
+            print('new objective value', data.rmpres.fun)
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.05:
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
                 break
+            #This is only here because I want to save time
+            PIK = "outputGraphics/allbeamshapes-save-" + str(C) + ".pickle"
+            with open(PIK, "wb") as f:
+                pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
+            f.close()
+            PIK = "outputGraphics/beamList-save-" + str(C) + ".pickle"
+            with open(PIK, "wb") as f:
+                pickle.dump(beamList, f, pickle.HIGHEST_PROTOCOL)
+            f.close()
+
+            mynumbeams = beam.numBeams
+            M = beam.M
+            N = beam.N
+            datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
+                        data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures,
+                        structureList, data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder]
+            PIK = "outputGraphics/pickle-C-" + str(C) + "-save.dat"
+            with open(PIK, "wb") as f:
+                pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+            f.close()
         if eliminationPhase | refinementloops:
             printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
         else:
             printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
                                  C)
     plotApertures(C)
-    mynumbeams = beam.numBeams
-    M = beam.M
-    N = beam.N
-    datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
-                data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures, structureList,
-                data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder]
-    PIK = "outputGraphics/pickle-C-" + str(C) + "-save.dat"
-    with open(PIK, "wb") as f:
-        pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-    f.close()
     return(data.rmpres.x)
 
 # The next function prints DVH values
@@ -1114,7 +1122,7 @@ def printresults(iterationNumber, myfolder, Cvalue):
     plt.ylabel('Fractional Volume')
     plt.title('Number of Beams: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
-    plt.savefig(myfolder + 'DVH-for-debugging-greedyVMATLight' + str(Cvalue) + str(iterationNumber) + '.png')
+    plt.savefig(myfolder + 'DVH-VMAT-C-' + str(Cvalue) + '-beams-' + str(iterationNumber) + '.png')
     plt.close()
 
 def plotApertures(C):
@@ -1185,8 +1193,6 @@ def plotAperturesBug(C):
             pp.savefig()
             plt.close()
     pp.close()
-    #fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
-
 
 start = time.time()
 data = problemData(numbeams)
@@ -1222,7 +1228,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 10.0
+CValue = 0.1
 if debugmode:
     finalintensities = column_generation(CValue, 5)
 else:

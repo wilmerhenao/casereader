@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import linear_model
 from scipy import stats
+from scipy.stats.stats import pearsonr
 
 class beam(object):
     numBeams = 0
@@ -39,13 +40,108 @@ class beam(object):
         self.Area = 0
         beam.numBeams += 1
 
-CValue = 1e-09
+class problemData(object):
+    def __init__(self, numberbeams):
+        self.kappa = []
+        self.notinC = apertureList()
+        self.caligraphicC = apertureList()
+        self.currentDose = np.zeros(voxel.numVoxels, dtype = float)
+        self.quadHelperThresh = np.empty(voxel.numVoxels, dtype = float)
+        self.quadHelperOver = np.empty(voxel.numVoxels, dtype = float)
+        self.quadHelperUnder = np.empty(voxel.numVoxels, dtype = float)
+        self.maskValue = np.empty(voxel.numVoxels, dtype = float)
+        self.setQuadHelpers(structureList, voxelList)
+        self.openApertureMaps = [[] for i in range(beam.numBeams)]
+        self.diagmakers = [[] for i in range(beam.numBeams)]
+        self.strengths = [[] for i in range(beam.numBeams)]
+        self.DlistT = None
+        self.currentIntensities = np.zeros(beam.numBeams, dtype=float)
+        self.voxelsUsed = None # This is going to be a set
+        self.structuresUsed = None
+        self.structureIndexUsed = None
+        self.YU = None
+        self.RU = None
+        self.speedlim = None
+        self.rmpres = None
+        self.listIndexofAperturesRemovedEachStep = []
+        self.listIndexofAperturesAddedEachStep = []
+        self.distancebetweenbeams = int(360 / numberbeams)  # Assumes beam regularly discretized on the circle.
+
+class structure(object):
+    ## Static variable that keeps a tally of the total number of structures
+    numStructures = 0
+    numTargets = 0
+    numOARs = 0
+    def __init__(self, sthing):
+        self.Id = sthing.Id
+        self.pointsDistanceCM = sthing.pointsDistanceCM
+        self.StartPointIndex = sthing.StartPointIndex
+        self.EndPointIndex = sthing.EndPointIndex
+        self.Size = self.EndPointIndex - self.StartPointIndex
+        self.isTarget = False
+        self.isKilled = False
+        # Identify targets
+        alb = "PTV" in self.Id;
+        ala = "GTV" in self.Id;
+        alc = "CTV" in self.Id;
+        if ( alb | ala  | alc):
+            self.isTarget = True
+        if self.isTarget:
+            structure.numTargets = structure.numTargets + 1
+            # NEVER CHANGE THIS! YOU MIGHT HAVE TROUBLE LATER
+            self.threshold = 0.0
+            self.overdoseCoeff = 0.0
+            self.underdoseCoeff = 0.0
+        else:
+            structure.numOARs += 1
+            self.threshold = 0.0
+            self.overdoseCoeff = 0.0
+            self.underdoseCoeff = 0.0
+        structure.numStructures += 1
+
+def plotAperture(index, llist, rlist, befaft):
+    magnifier = 50
+    lmag = llist
+    rmag = rlist
+    nrows = 8
+    ncols = 14
+    ## Convert the limits to hundreds.
+    for posn in range(0, len(lmag)):
+        lmag[posn] = int(magnifier * lmag[posn])
+        rmag[posn] = int(magnifier * rmag[posn])
+    image = -1 * np.ones(magnifier * nrows * ncols)
+        # Reshape things into a 9x9 grid
+    image = image.reshape((nrows, magnifier * ncols))
+    for i in range(0, beam.M):
+        image[i, lmag[i]:(rmag[i]-1)] = 1 #intensity assignment
+    image = np.repeat(image, 1*magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
+    #image[0,0] = data.YU # In order to get the right list of colors
+    # Set up a location where to save the figure
+    fig = plt.figure(1)
+    cmapper = plt.get_cmap("autumn_r")
+    cmapper.set_under('black', 1.0)
+    plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = 1)
+    plt.axis('off')
+    #plt.show()
+    fig.savefig("/mnt/datadrive/Dropbox" + '/Research/VMAT/casereader/outputGraphics/apertureEvolution'+ befaft + str(index) + '.png')
+
+def apertureEvolution(index):
+    plotAperture(index, apertures[index][0], apertures[index][1], 'before')
+    plotAperture(index, aps[index].llist, aps[index].rlist, 'after')
+
+CValue = 0.0
+PIK = "outputGraphics/pickle-C-" + str(CValue) + "-save.dat"
+with open(PIK, "rb") as f:
+    datasave = pickle.load(f)
+f.close()
+intensities = datasave[14]
 
 PIK = "outputGraphics/allbeamshapes-save-" + str(CValue) + ".pickle"
 
 with open(PIK, "rb") as f:
     apertures = pickle.load(f)
 f.close()
+#apertures = apertures[:180]
 kellys = []
 perimeter = []
 area = []
@@ -73,8 +169,16 @@ plt.ylabel("Our Measure")
 plt.title("Aperture Penalization Comparison " + str(len(kellys)) + " Apertures")
 plt.savefig('outputGraphics/comparison' + str(CValue) + '.png')
 plt.close()
+# Calculate and print Kelly's edge metric.
+averageNW = 0.0
+averageW = 0.0
+for i in range(180):
+    averageNW += Y[i]
+    averageW += Y[i] * intensities[i]
+print('averageW before:', averageW/180)
+print('averageNW before:', averageNW/180)
 
-sys.exit()
+#sys.exit()
 
 PIK = "outputGraphics/beamList-save-" + str(CValue) + ".pickle"
 with open(PIK, "rb") as f:
@@ -107,7 +211,17 @@ plt.ylabel("Our Measure")
 plt.title("Aperture Penalization Comparison")
 plt.savefig('outputGraphics/comparisonFinalBeams' + str(CValue) + '.png')
 plt.close()
-
+print('correlation', pearsonr(Y, ourmeasure))
 print('Ended lecture of beams')
+apertureEvolution(158)
+
+averageNW = 0.0
+averageW = 0.0
+for i in range(180):
+    averageNW += Y[i]
+    averageW += Y[i] * intensities[i]
+print('averageW after:', averageW/180)
+print('averageNW after:', averageNW/180)
+print('Final Objective Value of the function is:', datasave[17])
 
 sys.exit()

@@ -13,6 +13,7 @@ gc.enable()
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
     datalocation = "/mnt/fastdata/Data/spine360"
+    datalocation = "/mnt/datadrive/Dropbox/Data/lung360"
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360"
@@ -20,11 +21,20 @@ elif 'sharkpool' == socket.gethostname(): # MY HOUSE
 else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
-datafiles = [datalocation + "/by-Structure/PsVM2m_2_90_2/fc0a4f7a-04ab-4e90-90ce-a39005760280",
-             datalocation + "/by-Structure/PsVM1m_92_180_2/195af10c-705a-4867-a95a-dc3d2f60b0eb",
-             datalocation + "/by-Structure/PsVM4m_182_270_2/f24672e5-c46c-44fa-9211-4df2591f1b4f",
-             datalocation + "/by-Structure/PsVM3m_272_0_2/8cfc980e-9e04-4afb-b938-5f9702f7f4a6"]
+#datafiles = [datalocation + "/by-Structure/PsVM2m_2_90_2/fc0a4f7a-04ab-4e90-90ce-a39005760280",
+#             datalocation + "/by-Structure/PsVM1m_92_180_2/195af10c-705a-4867-a95a-dc3d2f60b0eb",
+#             datalocation + "/by-Structure/PsVM4m_182_270_2/f24672e5-c46c-44fa-9211-4df2591f1b4f",
+#             datalocation + "/by-Structure/PsVM3m_272_0_2/8cfc980e-9e04-4afb-b938-5f9702f7f4a6"]
+
+datafiles = [datalocation + "/by-Structure/pVMAT2_Lung_2_90_2/36a98014-3901-4b79-86b2-67eb9724286a",
+             datalocation + "/by-Structure/pVMAT1_Lung_92_180_2/83970c99-6b24-4846-8b6c-ca2636cfd8e6",
+             datalocation + "/by-Structure/pVMAT4_Lung_182_270_2/16dd961c-6463-498b-a020-a34128695540",
+             datalocation + "/by-Structure/pVMAT3_Lung_272_0_2/01602856-4fc6-4de4-ad26-a828168c0db8"]
+
 resultslocation = "/mnt/datadrive/Dropbox/Data/spine360/numbernames/"
+
+resultslocation = "/mnt/datadrive/Dropbox/Data/lung360/numbernames/"
+
 # The first file will contain all the structure data, the rest will contain pointodoses.
 alldata = DoseToPoints_pb2.DoseToPointsData()
 numstructs = []
@@ -118,10 +128,17 @@ def get_files_by_file_size(dirname, reverse=False):
 
 accumulator = 0
 
+# This is for the spine case
 datafolders = [datalocation + "/by-Structure/PsVM2m_2_90_2/",
              datalocation + "/by-Structure/PsVM1m_92_180_2/",
              datalocation + "/by-Structure/PsVM4m_182_270_2/",
              datalocation + "/by-Structure/PsVM3m_272_0_2/"]
+# This is for the lung Case
+datafolders = [datalocation + "/by-Structure/pVMAT2_Lung_2_90_2/",
+               datalocation + "/by-Structure/pVMAT1_Lung_92_180_2/",
+               datalocation + "/by-Structure/pVMAT4_Lung_182_270_2/",
+               datalocation + "/by-Structure/pVMAT3_Lung_272_0_2/"]
+
 for folder in datafolders:
     files = get_files_by_file_size(folder)
     files.pop(0)
