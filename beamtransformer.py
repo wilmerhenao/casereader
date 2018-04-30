@@ -4,6 +4,9 @@ import sys
 
 readfolder = '/mnt/datadrive/Dropbox/Data/spine360/numbernames/'
 resultfolder = '/mnt/datadrive/Dropbox/Data/spine360/by-Beam/'
+
+readfolder = '/mnt/datadrive/Dropbox/Data/lung360/numbernames/'
+resultfolder = '/mnt/datadrive/Dropbox/Data/lung360/by-Data/'
 #myfolder = '/home/wilmer/Dropbox/Data/spine360/by-Beam/'
 #data = pickle.load( open( myfolder + "358.pickle", "rb" ) )
 

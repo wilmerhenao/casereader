@@ -1,4 +1,5 @@
 #!/opt/intel/intelpython3/bin/python3.6
+import numpy as np
 import dose_to_points_data_pb2
 import sys
 import os
@@ -17,15 +18,26 @@ import pickle
 from matplotlib.backends.backend_pdf import PdfPages
 
 # List of organs that will be used# List of organs that will be used
+# The last one is the case to be analysed. They all overwrite
+caseis = "spine360"
+caseis = "lung360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
-                               #[esoph,     trachea,         cordprv,         ptv,         cord ]
+                         #[      esoph,      trachea,         cordprv,         ptv,        cord ]
 threshold  =              [         10,           10,               5,          39,           5 ]
 undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E-2,         0.0 ]
 overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-2, 3015 * 2E-3 ]
-structureListRestricted = [          4,            8,               1,           7,           0 ]
+
+if "lung360" == caseis:
+    structureListRestricted = [          0,            1,               2,           3,           4,            5 ]
+    #limits                   [      60-66,      Mean<20,                ,       max45,mean20-max63, mean34-max63 ]
+                           #[PTV Composite,    LUNGS-GTV,   CTEX_EXTERNAL,        CORD,       HEART,    ESOPHAGUS ]
+    threshold  =              [         63,           10,               5,          20,          10,           10 ]
+    undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
+    overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
+
 numcores   = 8
-testcase   = [i for i in range(0, 180, 30)]
+testcase   = [i for i in range(0, 180, 5)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = False
@@ -38,9 +50,11 @@ gc.enable()
 ## Find out the variables according to the hostname
 datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
-    datalocation = "/mnt/fastdata/Data/spine360/by-Beam/"
+    datalocation = "/mnt/fastdata/Data/" + caseis + "/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
     cutter = 44
+    if "lung360" == caseis:
+        cutter = 43
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
@@ -87,11 +101,11 @@ class structure(object):
 
 class beam(object):
     numBeams = 0
-    M = 8
-    N = 14
+    M = None
+    N = None
     # Initialize left and right leaf limits for all
     leftEdge = -1
-    rightEdge = 14
+    rightEdge = None
     leftEdgeFract = None
     rightEdgeFract = None
     JawX1 = None
@@ -236,6 +250,7 @@ for s in range(numstructs):
     structureList.append(structure(dpdata.Structures[s]))
     structureDict[structureList[s].Id] = s
     print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
+    
 print('Number of structures:', structure.numStructures, '\nNumber of Targets:', structure.numTargets,
       '\nNumber of OARs', structure.numOARs)
 # Manual modifications of targets
@@ -252,10 +267,18 @@ for s in structureListRestricted:
 numbeamlets = len(dpdata.Beamlets)
 beamletList = [None] * numbeamlets
 print('Reading in beamlet data:')
+xstartlist = []
+ystartlist = []
 for blt in range(numbeamlets):
     a = beamlet(dpdata.Beamlets[blt])
     beamletList[dpdata.Beamlets[blt].Index] = a
-    # print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
+    xstartlist.append(beamletList[blt].XStart)
+    ystartlist.append(beamletList[blt].YStart)
+    #print(beamletList[blt].XSize, beamletList[blt].YSize, beamletList[blt].XStart, beamletList[blt].YStart)
+
+beam.M = len(np.unique(ystartlist))
+beam.N = len(np.unique(xstartlist))
+beam.rightEdge = beam.N
 print('total number of beamlets read:', beamlet.numBeamlets)
 #----------------------------------------------------------------------------------------
 # Get the data about beams. They will be ordered. But the Id will be in half the range
@@ -381,6 +404,7 @@ def getDmatrixPiecesMemorySaving():
         del doses
         del input
         # Create the matrix that goes in the list
+        print(cutter, fl[cutter:])
         thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
         initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
         # Transform the space of beamlets to the new coordinate system starting from zero
@@ -575,7 +599,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
             wnetwork[thisnode] = weight
             # dadnetwork and mnetwork don't need to be changed here for obvious reasons
     posBeginningOfRow += nodesinpreviouslevel
-    leftmostleaf = 14 - 1 # Position in python position(-1) of the leftmost leaf
+    leftmostleaf = beam.N - 1 # Position in python position(-1) of the leftmost leaf
     # Then handle the calculations for the m rows. Nodes that are neither source nor sink.
     for m in range(1,M):
         oldflag = nodesinpreviouslevel
@@ -620,7 +644,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
         posBeginningOfRow = nodesinpreviouslevel + posBeginningOfRow # This is the total number of network nodes
         # Keep the location of the leftmost leaf
-        leftmostleaf = 14 + leftmostleaf
+        leftmostleaf = beam.N + leftmostleaf
     # thisnode gets augmented only 1 because only the sink node will be added
     thisnode += 1
 
@@ -929,7 +953,7 @@ def column_generation(C, K):
     data.RU = 20.0
     ## Maximum intensity
     data.YU = data.RU / data.speedlim
-    beamletwidth = 1.0
+    beamletwidth = beamlet.XSize / 10.0
     beam.leftEdgeFract = beam.leftEdge + (K - 1) / K
     beam.rightEdgeFract = beam.rightEdge - (K - 1) / K
 
@@ -1001,13 +1025,13 @@ def column_generation(C, K):
             optimalvalues.append(data.rmpres.fun)
             plotcounter = plotcounter + 1
             if eliminationPhase | refinementloops:
-                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/' + caseis, C)
             else:
-                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE', C)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE'  + caseis, C)
         print('caligraphicC:', data.caligraphicC.angle)
         print('notinC: ', data.notinC.angle)
     # Set up an order to go refining one by one.
-    PIK = "outputGraphics/allbeamshapesbefore-save-" + str(C) + ".pickle"
+    PIK = "outputGraphics/allbeamshapesbefore-save-" +  caseis + '-' + str(C) + ".pickle"
     with open(PIK, "wb") as f:
         pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
     f.close()
@@ -1051,7 +1075,7 @@ def column_generation(C, K):
                 # Precalculate the aperture map to save times.j
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
                 data.rmpres = solveRMC(data.YU, 100)
-                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+                printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/' + caseis, C)
             print("Let's see round of refinement", refinementLoopCounter)
             print('oldObjectiveValue Comparison', oldObjectiveValue, data.rmpres.fun)
             print('caligraphicC:', data.caligraphicC.angle)
@@ -1063,11 +1087,11 @@ def column_generation(C, K):
                 print('notinC: ', data.notinC.angle)
                 break
             #This is only here because I want to save time
-            PIK = "outputGraphics/allbeamshapes-save-" + str(C) + ".pickle"
+            PIK = "outputGraphics/allbeamshapes-save-" + caseis + str(C) + ".pickle"
             with open(PIK, "wb") as f:
                 pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
             f.close()
-            PIK = "outputGraphics/beamList-save-" + str(C) + ".pickle"
+            PIK = "outputGraphics/beamList-save-" + caseis + str(C) + ".pickle"
             with open(PIK, "wb") as f:
                 pickle.dump(beamList, f, pickle.HIGHEST_PROTOCOL)
             f.close()
@@ -1078,14 +1102,14 @@ def column_generation(C, K):
             datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
                         data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures,
                         structureList, data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder]
-            PIK = "outputGraphics/pickle-C-" + str(C) + "-save.dat"
+            PIK = "outputGraphics/pickle-C-" + caseis + '-' + str(C) + "-save.dat"
             with open(PIK, "wb") as f:
                 pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
             f.close()
         if eliminationPhase | refinementloops:
-            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/', C)
+            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/' + caseis, C)
         else:
-            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE',
+            printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE' + caseis,
                                  C)
     plotApertures(C)
     return(data.rmpres.x)
@@ -1116,7 +1140,10 @@ def printresults(iterationNumber, myfolder, Cvalue):
     print(dvh_matrix.shape)
 
     myfig = pylab.plot(bin_center, dvh_matrix.T, linewidth = 2.0)
-    pylab.xlim(0, 60)
+    if caseis == "spine360":
+        pylab.xlim(0, 60)
+    else:
+        pylab.xlim(0, 70)
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
@@ -1153,7 +1180,7 @@ def plotApertures(C):
         cmapper.set_under('black', 1.0)
         plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
         plt.axis('off')
-    fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.png')
+    fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures' + caseis + str(C) + '.png')
     plt.close()
     
 def plotAperturesBug(C):
@@ -1165,7 +1192,7 @@ def plotAperturesBug(C):
     ycoor = 4
     nrows, ncols = beam.M, beam.N
     print('numbeams', beam.numBeams)
-    pp = PdfPages(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures'+ str(C) + '.pdf')
+    pp = PdfPages(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures' + caseis + str(C) + '.pdf')
     for mynumbeam in range(0, beam.numBeams):
         position = mynumbeam % (xcoor * ycoor)
         lmag = beamList[mynumbeam].llist
@@ -1228,7 +1255,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.1
+CValue = 0.0
 if debugmode:
     finalintensities = column_generation(CValue, 5)
 else:
@@ -1241,11 +1268,11 @@ for i in range(beam.numBeams):
 
 print('averageW:', averageW/beam.numBeams)
 print('averageNW:', averageNW/beam.numBeams)
-PIK = "outputGraphics/allbeamshapes-save-"+ str(CValue) + ".pickle"
+PIK = "outputGraphics/" + caseis + "allbeamshapes-save-" + str(CValue) + ".pickle"
 with open(PIK, "wb") as f:
     pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
 f.close()
-PIK = "outputGraphics/beamList-save-"+ str(CValue) + ".pickle"
+PIK = "outputGraphics/" + caseis + "beamList-save-" + str(CValue) + ".pickle"
 with open(PIK, "wb") as f:
     pickle.dump(beamList, f, pickle.HIGHEST_PROTOCOL)
 f.close()
