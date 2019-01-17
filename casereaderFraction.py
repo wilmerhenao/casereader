@@ -20,10 +20,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
 
-#caseis = "spine360"
+caseis = "spine360"
 caseis = "lung360"
-#caseis = "brain360"
-#caseis = "braiF360"
+caseis = "brain360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
                          #[      esoph,      trachea,         cordprv,         ptv,        cord ]
@@ -39,42 +38,14 @@ if "lung360" == caseis:
     undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
 
-ptvpriority = False
+if "brain360" == caseis:
+    structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
+    #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
+    #                                                                  60           54           54         54      40      40      10            40]
+    threshold  =              [         33,           33,            5.0,        5.0,        5.0,         5.0, 5.0,  5.0,   5.0,         5.0]
+    undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
+    overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
 
-if not ptvpriority:
-    # Make sure that the optic nerve is preserved
-    if "brain360" == caseis:
-        structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
-        #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
-        #                                                                  60           54           54         54      40      40      10            40]
-        threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
-        undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
-        overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
-    if "braiF360" == caseis:
-        structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
-        # limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
-        #                                                                  60           54           54         54      40      40      10            40]
-        threshold = [33, 33, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-        undercoeff = [100, 5E+3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
-
-else:
-    # Make sure that the PTV dies
-    if "brain360" == caseis:
-        structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
-        #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
-        #                                                                  60           54           54         54      40      40      10            40]
-        threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
-        undercoeff =              [        100,         5E+4,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
-        overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
-
-    if "braiF360" == caseis:
-        structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
-        # limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
-        #                                                                  60           54           54         54      40      40      10            40]
-        threshold = [33, 33, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-        undercoeff = [300, 5E+4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
 numcores   = 8
 testcase   = [i for i in range(0, 180, 5)]
 fullcase   = [i for i in range(180)]
@@ -98,46 +69,14 @@ elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
     cutter = 51
-elif 'DESKTOP-EA1PG8V' == socket.gethostname(): # MY HOUSE
-    datalocation = "C:/Users/wihen/Data/"+ caseis + "/by-Beam/"
-    dropbox = "D:/Dropbox"
-    cutter = 45
-    numcores = 11
-    if "lung360" ==  caseis:
-        cutter = 44
-elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[-1]): # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/" + caseis + "/by-Beam/"
+elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]): # FLUX
+    datalocation = "/scratch/engin_flux/wilmer/spine360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
-    cutter = 52
-    if "lung360" ==  caseis:
-        cutter = 51
 else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
 
-## This class contains data about the running times of the program
-# The class contains member functions that keep track of the reading times
-# and the refinement loops
-class timedata(object):
-    def __init__(self):
-        self.initialtime = time.time()
-        self.lasttime = time.time()
-        self.looptimes = list()
-        self.readtime = np.inf
-
-    def newloop(self):
-        self.looptimes.append(time.time() - self.lasttime)
-        self.lasttime = time.time()
-
-    def readingtime(self):
-        self.readtime  = time.time() - self.lasttime
-        self.lasttime = time.time()
-
-mytime = timedata()
-
 ## This class contains a structure (region)
-# It could be a PTV or an organ. It also keeps track of the associated goals such
-# as the function coefficients as they pertain to the objective function
 class structure(object):
     ## Static variable that keeps a tally of the total number of structures
     numStructures = 0
@@ -170,8 +109,6 @@ class structure(object):
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
-## Contains the beam data
-# It keeps the location, the beamlet members, different measures of the aperture
 class beam(object):
     numBeams = 0
     M = None
@@ -206,9 +143,6 @@ class beam(object):
         self.Area = 0
         beam.numBeams += 1
 
-## Class that contains the voxel information
-# It contains geographical location of the voxel, its index, and the masking
-# (what structure it belongs to)
 class voxel(object):
     numVoxels = 0
     def __init__(self, sthing):
@@ -219,8 +153,6 @@ class voxel(object):
         self.Y = sthing.Y
         self.Z = sthing.Z
 
-## Class that contains the beamlet information
-# Includes sizes of beamlets, what beam it belongs to
 class beamlet(object):
     numBeamlets = 0
     XSize = None
@@ -313,7 +245,6 @@ datafiles = get_files_by_file_size(datalocation)
 dpdata = dose_to_points_data_pb2.DoseToPointsData()
 
 # Start with reading structures, numvoxels and all that.
-print('datafiles:', datafiles)
 f = open(datafiles.pop(0), "rb")
 dpdata.ParseFromString(f.read())
 f.close()
@@ -496,7 +427,6 @@ def getDmatrixPiecesMemorySaving():
         gc.collect()
     return(beamDs, uniquev)
 #------------------------------------------------------------------------------------------------------------------
-## This class keeps the core of the function parameters. Regularly calculates doses, and the values of obj. fn. and gradients
 class problemData(object):
     def __init__(self, numberbeams):
         self.kappa = []
@@ -524,7 +454,6 @@ class problemData(object):
         self.listIndexofAperturesAddedEachStep = []
         self.distancebetweenbeams = int(360 / numberbeams)  # Assumes beam regularly discretized on the circle.
 
-    ## Organizes parameters of the objective function
     def setQuadHelpers(self, sList, vList):
         for i in range(voxel.numVoxels):
             sid = structureDict[vList[i].StructureId] # Find structure of this particular voxel
@@ -533,7 +462,6 @@ class problemData(object):
             self.quadHelperUnder[i] = sList[sid].underdoseCoeff / sList[sid].Size
             self.maskValue[i] = 2**sid
 
-    ## This function regularly enters the optimization engine to calculate doses
     def calcDose(self):
         self.currentDose = np.zeros(voxel.numVoxels, dtype = float)
         self.dZdK = np.matrix(np.zeros((voxel.numVoxels, beam.numBeams)))
@@ -582,7 +510,7 @@ def fvalidbeamlets(index):
 # succ = succesor index, either an index or an empty list
 # lcm = vector of left limits in the previous aperture
 # lcp = vector of left limits in the next aperture
-# rcm = vector of right limits in the pPPrevious aperture
+# rcm = vector of right limits in the previous aperture
 # rcp = vector of right limits in the previous aperture
 # N = Number of beamlets per row
 # M = Number of rows in an aperture
@@ -867,14 +795,14 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
         print("One of the best apertures was: ", bestApertureIndex)
         # Calculate Kelly's aperture measure
         Area = 0.0
-        Perimeter = (r[0] - l[0]) + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
+        Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
         #for n in range(len(l)):
         #    Area += 0.5 * (r[n] - l[n]) * 0.5
         for n in range(1, len(l)):
-            Area += 1.0 * (r[n] - l[n])
+            Area += 1.0 * (r[n] - l[n]) / 5
             Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
-            Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))
-        Perimeter += (r[len(r)-1] - l[len(l)-1]) + np.sign(r[len(r)-1] - l[len(l)-1])
+            Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
+        Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
         print(Perimeter, Area)
         Kellymeasure = Perimeter / Area
         pstarlist.append(pstar)
@@ -964,6 +892,7 @@ def calcObjGrad(x, user_data = None):
 def solveRMC(YU, mymaxiter = 20):
     start = time.time()
     numbe = data.caligraphicC.len()
+
     calcObjGrad(data.currentIntensities)
     # Create the boundaries making sure that the only free variables are the ones with perfectly defined apertures.
     boundschoice = []
@@ -973,6 +902,7 @@ def solveRMC(YU, mymaxiter = 20):
         else:
             boundschoice.append((0, 0))
     res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds = boundschoice, tol = 0.1)#, options={'ftol':10e-1, 'disp':5,'maxfun':mymaxiter})
+
     print('Restricted Master Problem solved in ' + str(time.time() - start) + ' seconds')
     return(res)
 
@@ -1018,7 +948,7 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
         data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
     return(data.rmpres.fun - oldobj)
 
-def column_generation(C, K, mytime):
+def column_generation(C, K):
     C2 = 1/3
     C3 = 1/4
     #eliminationThreshold = 0.1 Wilmer:This one worked really Well
@@ -1115,11 +1045,10 @@ def column_generation(C, K, mytime):
     with open(PIK, "wb") as f:
         pickle.dump(allbeamshapes, f, pickle.HIGHEST_PROTOCOL)
     f.close()
-    mytime.newloop()
     if refinementloops:
         phi = 0
         refinementLoopCounter = 0
-        while refinementLoopCounter < 5:
+        while refinementLoopCounter < 1000:
             refinementLoopCounter += 1
             # Create the list of contributions
             contributionsPengList = []
@@ -1184,31 +1113,26 @@ def column_generation(C, K, mytime):
             N = beam.N
             datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
                         data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures,
-                        structureList, data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder,
-                        mytime, socket.gethostname(), beamlet.XSize, beamlet.YSize]
+                        structureList, data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder]
             PIK = "outputGraphics/pickle-C-" + caseis + '-' + str(C) + "-save.dat"
             with open(PIK, "wb") as f:
                 pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
             f.close()
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.01: #epsilon
+            if np.abs((oldObjectiveValue - Wn)/oldObjectiveValue) < 0.05:
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
-                mytime.newloop()
                 break
         if eliminationPhase | refinementloops:
             printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/' + caseis, C)
         else:
             printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/NOELIMINATIONPHASE' + caseis,
                                  C)
-        mytime.newloop()
     plotApertures(C)
     return(data.rmpres.x)
 
 # The next function prints DVH values
 def printresults(iterationNumber, myfolder, Cvalue):
-    if ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[-1]):
-        myfolder = "/home/wilmer/Dropbox/Research/outputGraphics"
     data.maskValue = np.array([int(i) for i in data.maskValue])
     print('Starting to Print Result DVHs')
     zvalues = data.currentDose
@@ -1237,20 +1161,14 @@ def printresults(iterationNumber, myfolder, Cvalue):
         pylab.xlim(0, 60)
     elif caseis == "brain360":
         pylab.xlim(0, 86)
-    elif caseis == "braiF360":
-        pylab.xlim(0, 44)
     else:
         pylab.xlim(0, 70)
     plt.grid(True)
     plt.xlabel('Dose Gray')
     plt.ylabel('Fractional Volume')
-    plt.title('DVH-VMAT-C-' + str(Cvalue) + '-beams-' + str(iterationNumber) + caseis + '.png')
+    plt.title('Number of Beams: ' + str(iterationNumber))
     plt.legend(structureNames, prop={'size':9})
-    if not ptvpriority:
-        plt.savefig(myfolder + 'DVH-VMAT-C-' + str(Cvalue) + '-beams-' + str(iterationNumber) + caseis + '.png')
-    else:
-        plt.savefig(myfolder + 'DVH-VMAT-PTVPRIORITY-C-' + str(Cvalue) + '-beams-' + str(iterationNumber) + caseis + '.png')
-        plt.title(caseis + "-PTV-Priority")
+    plt.savefig(myfolder + 'Fractioned-DVH-VMAT-C-' + str(Cvalue) + '-beams-' + str(iterationNumber) + '.png')
     plt.close()
 
 def plotApertures(C):
@@ -1357,14 +1275,10 @@ for s in data.structureIndexUsed:
 print(structureNames)
 
 CValue = 0.0
-mytime.readingtime()
-if len(sys.argv) > 1:
-    CValue = float(sys.argv[1])
-    print('new CValue is:', CValue)
 if debugmode:
-    finalintensities = column_generation(CValue, 5, mytime)
+    finalintensities = column_generation(CValue, 5)
 else:
-    finalintensities = column_generation(CValue, 5, mytime) # Second argument here determines how many times I will cut each beamlet artificially
+    finalintensities = column_generation(CValue, 5) # Second argument here determines how many times I will cut each beamlet artificially
 averageNW = 0.0
 averageW = 0.0
 for i in range(beam.numBeams):

@@ -14,6 +14,7 @@ datalocation = '~'
 if 'radiation-math' == socket.gethostname(): # LAB
     datalocation = "/mnt/fastdata/Data/spine360"
     datalocation = "/mnt/datadrive/Dropbox/Data/lung360"
+    datalocation = "/mnt/datadrive/Dropbox/Data/brain360"
     dropbox = "/mnt/datadrive/Dropbox"
 elif 'sharkpool' == socket.gethostname(): # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/spine360"
@@ -31,9 +32,17 @@ datafiles = [datalocation + "/by-Structure/pVMAT2_Lung_2_90_2/36a98014-3901-4b79
              datalocation + "/by-Structure/pVMAT4_Lung_182_270_2/16dd961c-6463-498b-a020-a34128695540",
              datalocation + "/by-Structure/pVMAT3_Lung_272_0_2/01602856-4fc6-4de4-ad26-a828168c0db8"]
 
+datafiles = [datalocation + "/by-Structure/pVMATDTP1/4b88f023-379f-45ae-a82e-67b26fc5203f",
+             datalocation + "/by-Structure/pVMATDTP2/095374a4-e859-4c6c-b2ae-19ac7487f9cf",
+             datalocation + "/by-Structure/pVMATDTP3/1ad88e84-f4d8-4eba-90aa-5d306c2704ec",
+             datalocation + "/by-Structure/pVMATDTP4/8ab1a759-8881-4c75-ae14-ef973fc313af"]
+
+    
 resultslocation = "/mnt/datadrive/Dropbox/Data/spine360/numbernames/"
 
 resultslocation = "/mnt/datadrive/Dropbox/Data/lung360/numbernames/"
+
+resultslocation = "/mnt/datadrive/Dropbox/Data/brain360/numbernames/"
 
 # The first file will contain all the structure data, the rest will contain pointodoses.
 alldata = DoseToPoints_pb2.DoseToPointsData()
@@ -88,16 +97,16 @@ for b in alldata.Beams:
 [print(b) for b in beamletdict.items()]
 # Perform tests on the data.
 try:
-    f = open(resultslocation + "identificationSpine2.protostream", "wb")
+    f = open(resultslocation + "identification.protostream", "wb")
     f.write(alldata.SerializeToString())
     f.close()
 except IOError:
     print("Problems while writing")
-print('termino')
+print('finished')
 print('Reading test')
 try:
     tester = DoseToPoints_pb2.DoseToPointsData()
-    f = open(resultslocation + "identificationSpine2.protostream", "rb")
+    f = open(resultslocation + "identification.protostream", "rb")
     tester.ParseFromString(f.read())
     #for p in tester.Points:
     #    print(p)
@@ -138,6 +147,11 @@ datafolders = [datalocation + "/by-Structure/pVMAT2_Lung_2_90_2/",
                datalocation + "/by-Structure/pVMAT1_Lung_92_180_2/",
                datalocation + "/by-Structure/pVMAT4_Lung_182_270_2/",
                datalocation + "/by-Structure/pVMAT3_Lung_272_0_2/"]
+# This is for the brain Case
+datafolders = [datalocation + "/by-Structure/pVMATDTP1/",
+               datalocation + "/by-Structure/pVMATDTP2/",
+               datalocation + "/by-Structure/pVMATDTP3/",
+               datalocation + "/by-Structure/pVMATDTP2/"]
 
 for folder in datafolders:
     files = get_files_by_file_size(folder)

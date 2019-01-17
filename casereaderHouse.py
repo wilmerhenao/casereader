@@ -867,14 +867,14 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
         print("One of the best apertures was: ", bestApertureIndex)
         # Calculate Kelly's aperture measure
         Area = 0.0
-        Perimeter = (r[0] - l[0]) + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
+        Perimeter = (r[0] - l[0])/5 + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
         #for n in range(len(l)):
         #    Area += 0.5 * (r[n] - l[n]) * 0.5
         for n in range(1, len(l)):
-            Area += 1.0 * (r[n] - l[n])
+            Area += 1.0 * (r[n] - l[n]) / 5
             Perimeter += np.sign(r[n] - l[n]) # Vertical part of the perimeter
-            Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))
-        Perimeter += (r[len(r)-1] - l[len(l)-1]) + np.sign(r[len(r)-1] - l[len(l)-1])
+            Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1]))/5
+        Perimeter += (r[len(r)-1] - l[len(l)-1]) / 5 + np.sign(r[len(r)-1] - l[len(l)-1])
         print(Perimeter, Area)
         Kellymeasure = Perimeter / Area
         pstarlist.append(pstar)
@@ -1185,7 +1185,7 @@ def column_generation(C, K, mytime):
             datasave = [mynumbeams, data.rmpres.x, C, C2, C3, vmax, data.speedlim, data.RU, data.YU, M, N, beamList,
                         data.maskValue, data.currentDose, data.currentIntensities, structure.numStructures,
                         structureList, data.rmpres.fun, data.quadHelperThresh, data.quadHelperOver, data.quadHelperUnder,
-                        mytime, socket.gethostname(), beamlet.XSize, beamlet.YSize]
+                        mytime, socket.gethostname()]
             PIK = "outputGraphics/pickle-C-" + caseis + '-' + str(C) + "-save.dat"
             with open(PIK, "wb") as f:
                 pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)

@@ -6,6 +6,9 @@ from sklearn import linear_model
 from scipy import stats
 from scipy.stats.stats import pearsonr
 
+caseis = "spine360"
+caseis = "lung360"
+
 class beam(object):
     numBeams = 0
     M = 8
@@ -123,20 +126,20 @@ def plotAperture(index, llist, rlist, befaft):
     plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = 1)
     plt.axis('off')
     #plt.show()
-    fig.savefig("/mnt/datadrive/Dropbox" + '/Research/VMAT/casereader/outputGraphics/apertureEvolution'+ befaft + str(index) + '.png')
+    fig.savefig("/mnt/datadrive/Dropbox" + '/Research/VMAT/casereader/outputGraphics/apertureEvolution' + caseis + befaft + str(index) + '.png')
 
 def apertureEvolution(index):
     plotAperture(index, apertures[index][0], apertures[index][1], 'before')
     plotAperture(index, aps[index].llist, aps[index].rlist, 'after')
 
-CValue = 0.0
-PIK = "outputGraphics/pickle-C-" + str(CValue) + "-save.dat"
+CValue = 0.001
+PIK = "outputGraphics/pickle-C-" + caseis + '-' + str(CValue) + "-save.dat"
 with open(PIK, "rb") as f:
     datasave = pickle.load(f)
 f.close()
 intensities = datasave[14]
 
-PIK = "outputGraphics/allbeamshapes-save-" + str(CValue) + ".pickle"
+PIK = "outputGraphics/" + caseis + "allbeamshapes-save-" + str(CValue) + ".pickle"
 
 with open(PIK, "rb") as f:
     apertures = pickle.load(f)
@@ -167,7 +170,7 @@ plt.plot(Y, fit[0] * Y + fit[1], color='red')
 plt.xlabel("Kelly's Measure")
 plt.ylabel("Our Measure")
 plt.title("Aperture Penalization Comparison " + str(len(kellys)) + " Apertures")
-plt.savefig('outputGraphics/comparison' + str(CValue) + '.png')
+plt.savefig('outputGraphics/comparison' + caseis + str(CValue) + '.png')
 plt.close()
 # Calculate and print Kelly's edge metric.
 averageNW = 0.0
@@ -180,7 +183,7 @@ print('averageNW before:', averageNW/180)
 
 #sys.exit()
 
-PIK = "outputGraphics/beamList-save-" + str(CValue) + ".pickle"
+PIK = "outputGraphics/" + caseis + "beamList-save-" + str(CValue) + ".pickle"
 with open(PIK, "rb") as f:
     aps = pickle.load(f)
 f.close()
@@ -209,7 +212,7 @@ plt.plot(Y, fit[0] * Y + fit[1], color='red')
 plt.xlabel("Kelly's Measure")
 plt.ylabel("Our Measure")
 plt.title("Aperture Penalization Comparison")
-plt.savefig('outputGraphics/comparisonFinalBeams' + str(CValue) + '.png')
+plt.savefig('outputGraphics/comparisonFinalBeams' + caseis + str(CValue) + '.png')
 plt.close()
 print('correlation', pearsonr(Y, ourmeasure))
 print('Ended lecture of beams')
