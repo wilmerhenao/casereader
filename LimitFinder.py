@@ -6,6 +6,7 @@ import os
 import time
 import gc
 from scipy import sparse
+import scipy.stats
 from scipy.optimize import minimize
 from multiprocessing import Pool
 from functools import partial
@@ -21,7 +22,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 #caseis = "spine360"
 caseis = "lung360"
-#caseis = "brain360"
+caseis = "brain360"
 #caseis = "braiF360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
@@ -75,10 +76,10 @@ else:
         undercoeff = [300, 5E+4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 5)]
+testcase   = [i for i in range(0, 180, 45)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = False
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -381,69 +382,8 @@ print('total number of voxels read:', voxel.numVoxels)
 ## Free the memory
 dpdata = None
 gc.collect()
-#----------------------------------------------------------------------------------------
-## Get the point to dose data in a sparse matrix
-def getDmatrixPieces():
-    if easyread:
-        # The analyse vectors are not being changed here because they will be read AFTER the optimization is done
-        print('doing an easyread')
-        if debugmode:
-            PIK = datalocation + '../testdump.dat'
-        else:
-            PIK = datalocation + '../fullcasedump.dat'
-        with open(PIK, "rb") as f:
-            datasave = pickle.load(f)
-        f.close()
-
-        newbcps = datasave[0]
-        newvcps = datasave[1]
-        newdcps = datasave[2]
-    else:
-        ## Initialize vectors for voxel component, beamlet component and dose
-        newvcps = []
-        newbcps = []
-        newdcps = []
-
-        thiscase = fullcase
-        if debugmode:
-            thiscase = testcase
-
-        # Get the ranges of the voxels that I am going to use and eliminate the rest
-        myranges = []
-        for i in structureListRestricted:
-            myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
-        ## Read the beams now.
-        counter = 0
-        for fl in [datafiles[x] for x in thiscase]:
-            print(fl)
-            counter += 1
-            print('reading datafile:', counter,fl)
-            input = open(fl, 'rb')
-            indices, doses = pickle.load(input)
-            input.close()
-            for k in indices.keys():
-                for m in myranges:
-                    if k in m:
-                        newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
-                        newbcps += indices[k]
-                        newdcps += doses[k]
-            gc.collect()
-            del indices
-            del doses
-            del input
-        print('voxels seen:', np.unique(newvcps))
-        datasave = [newbcps, newvcps, newdcps]
-        if debugmode:
-            PIK = datalocation + '../testdump.dat'
-        else:
-            PIK = datalocation + '../fullcasedump.dat'
-        with open(PIK, "wb") as f:
-            pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-        f.close()
-    return(newvcps, newbcps, newdcps)
 
 #----------------------------------------------------------------------------------------
-
 ## Get the point to dose data in a list of sparse matrices
 def getDmatrixPiecesMemorySaving():
     ## Initialize vectors for voxel component, beamlet component and dose
@@ -484,6 +424,29 @@ def getDmatrixPiecesMemorySaving():
         initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
         # Transform the space of beamlets to the new coordinate system starting from zero
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
+        # Wilmer Changed this part here
+        #-------------------------------------
+        threshold = 0.1
+        filterer = np.zeros(len(newbcps), dtype = np.int)
+
+        bcps = []
+        vcps = []
+        dcps = []
+        beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
+
+        for i, v in enumerate(newvcps):
+            if data.maskValue[v] < 3:
+                if newdcps[i] > threshold:
+                    bcps.append(newbcps[i])
+                    vcps.append(newvcps[i])
+                    dcps.append(newdcps[i])
+        for i in np.unique(bcps):
+            j = i % beam.N
+            k = i // beam.N
+            beamshape[k, j] = 1
+
+
+        #-------------------------------------
         #print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
         beamDs[thisbeam] = sparse.csr_matrix((newdcps, (newvcps, newbcps)), shape=(voxel.numVoxels, bpb), dtype=float)
         del newdcps
@@ -1350,6 +1313,7 @@ else:
     data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
     print('Assigned DmatBig in seconds: ', time.time() - starttime)
 print('total time reading dose to points:', time.time() - start)
+
 start = time.time()
 strsUsd = set([])
 strsIdxUsd = set([])
