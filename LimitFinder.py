@@ -401,13 +401,16 @@ def getDmatrixPiecesMemorySaving():
     #Beamlets per beam
     bpb = beam.N * beam.M
     uniquev = set()
-
+    xilist = []
+    psilist = []
+    xilowest = [beam.N // 2] * beam.M
+    psihighest = [beam.N // 2 + 1] * beam.M
     for fl in [datalocation + 'twolists'+ str(2*x) + '.pickle' for x in thiscase]:
         newvcps = []
         newbcps = []
         newdcps = []
         counter += 1
-        print('reading datafile:', counter, ' out of ', len(thiscase), fl)
+        print('reading datafile Boundary Creation:', counter, ' out of ', len(thiscase), fl)
         input = open(fl, 'rb')
         indices, doses = pickle.load(input)
         input.close()
@@ -417,7 +420,6 @@ def getDmatrixPiecesMemorySaving():
                     newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                     newbcps += indices[k]
                     newdcps += doses[k]
-                    uniquev.add(k)
         # Create the matrix that goes in the list
         print(cutter, fl[cutter:])
         thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
@@ -426,14 +428,11 @@ def getDmatrixPiecesMemorySaving():
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
         # Wilmer Changed this part here
         #-------------------------------------
-        threshold = 0.1
-        filterer = np.zeros(len(newbcps), dtype = np.int)
-
+        threshold = 0.4
         bcps = []
         vcps = []
         dcps = []
         beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
-
         for i, v in enumerate(newvcps):
             if data.maskValue[v] < 3:
                 if newdcps[i] > threshold:
@@ -445,15 +444,79 @@ def getDmatrixPiecesMemorySaving():
             k = i // beam.N
             beamshape[k, j] = 1
 
+        xi = np.empty(beam.M)
+        psi = np.empty(beam.M)
+        for i in range(beam.M):
+            myones = [i for i, x in enumerate(beamshape[i,]) if x == 1]
+            if 0 == len(myones):
+                xi[i], psi[i] = beam.N // 2, beam.N // 2 + 1
+            else:
+                xi[i], psi[i] = myones[0] - 1, myones[-1] + 1
+            if xi[i] < xilowest[i]:
+                xilowest[i] = xi[i]
+            if psi[i] > psihighest[i]:
+                psihighest[i] = psi[i]
+        xilist.append(xi)
+        psilist.append(psi)
+        del newdcps
+        del newbcps
+        del newvcps
+    # Identify positions to eliminate
+    position = int(0)
+    eliminateThesePositions = []
+    for i in range(beam.M):
+        for j in range(beam.N):
+            if j <= xilowest[i] or j >= psihighest[i]:
+                eliminateThesePositions.append(position)
+            position += 1
+        ## Do the real creation of matrices now
+    keepThesePositions = [i for i in range(bpb) if i not in eliminateThesePositions]
+    counter = 0
+    for fl in [datalocation + 'twolists' + str(2 * x) + '.pickle' for x in thiscase]:
+        newvcps = []
+        newbcps = []
+        newdcps = []
+        counter += 1
+        print('reading datafile:', counter, ' out of ', len(thiscase), fl)
+        input = open(fl, 'rb')
+        indices, doses = pickle.load(input)
+        input.close()
+        for k in indices.keys():  # k here represents the voxel that we are analyzing
+            for m in myranges:
+                if k in m:
+                    newvcps += [k] * len(indices[k])  # This is the voxel we're dealing with
+                    newbcps += indices[k]
+                    newdcps += doses[k]
+                    uniquev.add(k)
+        # Create the matrix that goes in the list
+        print(cutter, fl[cutter:])
+        thisbeam = int(int(fl[cutter:].split('.')[0]) / 2)  # Find the beamlet in its coordinate space (not in Angle)
+        initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
+        # Transform the space of beamlets to the new coordinate system starting from zero
+        newbcps = [i - initialBeamletThisBeam for i in newbcps]
+        # Remove all positions that for sure will not be used in the pricing problem to save memory
+        mylocs = np.isin(newbcps, keepThesePositions)
+        numgoodguys = sum(mylocs * 1)
+        shortnewbcps = [None] * numgoodguys
+        shortnewdcps = [None] * numgoodguys
+        shortnewvcps = [None] * numgoodguys
+        newgoodguy = 0
+        for i, l in enumerate(mylocs):
+            if l:
+                shortnewbcps[newgoodguy] = newbcps[i]
+                shortnewdcps[newgoodguy] = newdcps[i]
+                shortnewvcps[newgoodguy] = newvcps[i]
+                newgoodguy += 1
+        print(time.time() - old)
 
-        #-------------------------------------
-        #print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
-        beamDs[thisbeam] = sparse.csr_matrix((newdcps, (newvcps, newbcps)), shape=(voxel.numVoxels, bpb), dtype=float)
+        # print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
+        beamDs[thisbeam] = sparse.csr_matrix((shortnewdcps, (shortnewvcps, shortnewbcps)), shape=(voxel.numVoxels, bpb),
+                                             dtype=float)
         del newdcps
         del newbcps
         del newvcps
         gc.collect()
-    return(beamDs, uniquev)
+    return(beamDs, uniquev, xilist, psilist)
 #------------------------------------------------------------------------------------------------------------------
 ## This class keeps the core of the function parameters. Regularly calculates doses, and the values of obj. fn. and gradients
 class problemData(object):

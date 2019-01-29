@@ -201,6 +201,9 @@ def functionAndPenalties (beamList, ds):
         print('looptimes list in hours:', [int(i)/3600 for i in ds[21].looptimes ])
         print('reading time:', int(ds[21].readtime) / 3600)
 
+print('Analysis of aperture shapes')
+ds = pickle.load(open("outputGraphics/pickleApertures-1stPass-C-lung360-0.015-save.dat", "rb"))
+
 print('Analysis of Brain with an emphasis in OAR preservation')
 ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.0-save.dat", "rb"))
 beamList = pickle.load(open("outputGraphics/beamList-save-brain3600.0.pickle", "rb"))
@@ -330,3 +333,5 @@ print(mylist)
 
 with open('outputGraphics/data.json', 'w') as outfile:
     json.dump(mylist, outfile)
+
+

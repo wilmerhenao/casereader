@@ -1,5 +1,13 @@
 import pickle
 import numpy as np
+import socket
+import os
+import dose_to_points_data_pb2
+import matplotlib.pyplot as plt
+import sys
+from sklearn.linear_model import LinearRegression
+import pandas as pd
+from pandas.plotting import table
 
 class timedata(object):
     def __init__(self):
@@ -200,6 +208,165 @@ def functionAndPenalties (beamList, ds):
         #print('total running time:' - (int(ds[21].initialtime) - int(ds[21].lasttime))/3600)
         print('looptimes list in hours:', [int(i)/3600 for i in ds[21].looptimes ])
         print('reading time:', int(ds[21].readtime) / 3600)
+
+def get_files_by_file_size(dirname, reverse = False):
+    """ Return list of file paths in directory sorted by file size """
+    # Get list of files
+    filepaths = []
+    for basename in os.listdir(dirname):
+        filename = os.path.join(dirname, basename)
+        if os.path.isfile(filename):
+            filepaths.append(filename)
+    # Re-populate list with filename, size tuples
+    for i in range(len(filepaths)):
+        filepaths[i] = (filepaths[i], os.path.getsize(filepaths[i]))
+    # Sort list by file size
+    # If reverse=True sort from largest to smallest
+    # If reverse=False sort from smallest to largest
+    filepaths.sort(key = lambda filename: filename[1], reverse = reverse)
+    # Re-populate list with just filenames
+    for i in range(len(filepaths)):
+        filepaths[i] = filepaths[i][0]
+    return(filepaths)
+
+# Fetch the information about beamlet edges:
+
+def individualAnalizer(caseis):
+    # What computer am I reading from?
+    datalocation = '~'
+    if 'radiation-math' == socket.gethostname(): # LAB
+        datalocation = "/mnt/fastdata/Data/" + caseis + "/by-Beam/"
+        dropbox = "/mnt/datadrive/Dropbox"
+        cutter = 44
+        if "lung360" == caseis:
+            cutter = 43
+    elif 'sharkpool' == socket.gethostname(): # MY HOUSE
+        datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/"
+        dropbox = "/home/wilmer/Dropbox"
+        cutter = 51
+    elif 'DESKTOP-EA1PG8V' == socket.gethostname(): # MY HOUSE
+        datalocation = "C:/Users/wihen/Data/"+ caseis + "/by-Beam/"
+        dropbox = "D:/Dropbox"
+        cutter = 45
+        numcores = 11
+        if "lung360" ==  caseis:
+            cutter = 44
+    elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[-1]): # FLUX
+        datalocation = "/scratch/engin_flux/wilmer/" + caseis + "/by-Beam/"
+        dropbox = "/home/wilmer/Dropbox"
+        cutter = 52
+        if "lung360" ==  caseis:
+            cutter = 51
+    else:
+        datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
+        dropbox = "/home/wilmer/Dropbox"
+
+    datafiles = get_files_by_file_size(datalocation)
+    # The first file will contain all the structure data, the rest will contain pointodoses.
+    dpdata = dose_to_points_data_pb2.DoseToPointsData()
+    print('datafiles:', datafiles)
+    f = open(datafiles.pop(0), "rb")
+    dpdata.ParseFromString(f.read())
+    f.close()
+    datafiles.sort()
+
+    XSize = dpdata.Beamlets[0].XSize
+    YSize = dpdata.Beamlets[0].YSize
+    XSize = 1.0
+    YSize = 1.0
+    # Read all relevant files for a particular case
+    datafiles = get_files_by_file_size('./outputGraphics/')
+    matching = [s for s in datafiles if 'outputGraphics/allbeamshapesbefore-save-' +  caseis + '-' in s]
+    print('Areas will be calculated in squared milimeters. Same as perimeter in milimeters')
+    KellyMeasures = dict()
+    MyMeasures = dict()
+    if caseis == 'lung360':
+        cutter = 50
+    else:
+        cutter = 51
+    mylegends = list()
+    for PIK in matching:
+        mylegends.append(float(PIK[cutter:-7]))
+
+    print(matching)
+    matching = [x for _,x in sorted(zip(mylegends, matching))]
+    print(matching)
+
+    mylegends = list()
+    pendients = list()
+    for myColor, PIK in enumerate(matching):
+        print(PIK)
+        Cval = float(PIK[cutter:-7])
+        mylegends.append(Cval)
+        MLCtrip = pickle.load(open(PIK, "rb"))
+        KellyMeasures[PIK] = np.zeros(len(MLCtrip))
+        MyMeasures[PIK] = np.zeros(len(MLCtrip))
+        Perimeters = np.zeros(len(MLCtrip))
+        Areas = np.zeros(len(MLCtrip))
+        for i, thisbeam in enumerate(MLCtrip):
+            l = thisbeam[0]
+            r = thisbeam[1]
+            Perimeter = (r[0] - l[0])
+            Area = 0.0
+            for n in range(1, len(l)):
+                Area += (r[n] - l[n]) * YSize
+                Perimeter += (np.abs(l[n] - l[n-1]) + np.abs(r[n] - r[n-1]) - 2 * np.maximum(0, l[n-1] - r[n]) - 2 * np.maximum(0, l[n] - r[n - 1])) * XSize
+            Perimeter += (r[len(r)-1] - l[len(l)-1]) * XSize + np.sign(r[len(r)-1] - l[len(l)-1])
+            Kellymeasure = Perimeter / Area
+            Mymeasure = 1.0 * Perimeter - 0.55 * Area
+            KellyMeasures[PIK][i] = Kellymeasure
+            MyMeasures[PIK][i] = Mymeasure
+            Perimeters[i] = Perimeter
+            Areas[i] = Area
+        lm = LinearRegression(fit_intercept=False)
+        y = KellyMeasures[PIK] - Perimeters
+        y = np.reshape(y, (len(y), 1))
+        Areas = np.reshape(Areas, (len(y), 1))
+        reg = lm.fit(-Areas, y)
+        print(reg, reg.coef_)
+        pendients.append((Cval, reg.coef_[0]))
+        #print(reg.coef_)
+
+        if mylegends[-1] == 1.0 or mylegends[-1] == 0.001:
+            plt.scatter(MyMeasures[PIK], KellyMeasures[PIK], s = 13.0, marker = 'v')
+        elif mylegends[-1] == 0.0:
+            plt.scatter(MyMeasures[PIK], KellyMeasures[PIK], s=10.0, marker='o')
+        else:
+            plt.scatter(MyMeasures[PIK], KellyMeasures[PIK], s=1.0)
+        plt.title('Comparison of measures for case: ' + caseis)
+        plt.xlabel('Our Measure')
+        plt.ylabel("Younge's Measure")
+        plt.legend(mylegends)
+    plt.savefig('outputGraphics/ComparisonOfMeasuresForCase' + caseis + '.png')
+    #plt.show()
+    return(pendients)
+
+#caseis = "spine360"
+#caseis = "lung360"
+#caseis = "brain360"
+#caseis = "braiF360"
+cases = ("spine360", "lung360", "brain360", "braiF360")
+coefficients = list()
+for thiscase in cases:
+    coefficients.append((thiscase, individualAnalizer(thiscase)))
+
+for i in coefficients:
+    df = pd.DataFrame(columns=['C_Value', 'xi'])
+    for j in range(len(i[1])):
+        df.loc[j] = [i[1][j][0], i[1][j][1]]
+    print('generate latex code to paste in the document:')
+    print("\\begin{table}")
+    print('\\begin{tabular}{ll}')
+    print('C & \\xi \\\\ ')
+    print('\hline')
+    for j in range(len(i[1])):
+        print(i[1][j][0], '&', round(i[1][j][1], 2), ' \\\\ ')
+    print('\end{tabular}')
+    print('\end{table}')
+
+print(coefficients)
+
+sys.exit()
 
 print('Analysis of Brain with an emphasis in OAR preservation')
 ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.0-save.dat", "rb"))
