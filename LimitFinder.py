@@ -507,8 +507,6 @@ def getDmatrixPiecesMemorySaving():
                 shortnewdcps[newgoodguy] = newdcps[i]
                 shortnewvcps[newgoodguy] = newvcps[i]
                 newgoodguy += 1
-        print(time.time() - old)
-
         # print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
         beamDs[thisbeam] = sparse.csr_matrix((shortnewdcps, (shortnewvcps, shortnewbcps)), shape=(voxel.numVoxels, bpb),
                                              dtype=float)
