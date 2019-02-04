@@ -15,12 +15,13 @@ import pylab
 import matplotlib.pyplot as plt
 import pickle
 from matplotlib.backends.backend_pdf import PdfPages
+import traceback
 
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
 
 #caseis = "spine360"
-caseis = "lung360"
+#caseis = "lung360"
 caseis = "brain360"
 #caseis = "braiF360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
@@ -48,7 +49,7 @@ if not ptvpriority:
         #                                                                  60           54           54         54      40      40      10            40]
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
-        overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
+        overcoeff  =              [         50,         1E+3,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
         # limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
@@ -74,15 +75,16 @@ else:
         threshold = [33, 33, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         undercoeff = [300, 5E+4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
-numcores   = 8
-testcase   = [i for i in range(0, 180, 5)]
+numcores   = 1
+testcase   = [i for i in range(0, 180, 45)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = False
+debugmode = True
 easyread = False
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
 memorySaving = True
+numsubdivisions = 1
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -132,7 +134,6 @@ class timedata(object):
     def readingtime(self):
         self.readtime  = time.time() - self.lasttime
         self.lasttime = time.time()
-
 mytime = timedata()
 
 ## This class contains a structure (region)
@@ -176,8 +177,6 @@ class beam(object):
     numBeams = 0
     M = None
     N = None
-    leftEdgeFract = None
-    rightEdgeFract = None
     JawX1 = None
     JawX2 = None
     JawY1 = None
@@ -185,7 +184,7 @@ class beam(object):
     def __init__(self, sthing):
         # Initialize left and right leaf limits for all
         self.leftEdge = self.N // 2
-        self.rightEdge = self.N // 2 + 1
+        self.rightEdge = self.N // 2 + 1/numsubdivisions
         # Update the static counter and other variables
         self.location = int(int(sthing.Id)/2)
         self.Id = self.location
@@ -201,9 +200,16 @@ class beam(object):
         self.beamletsInBeam = self.beamletsPerBeam
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
+        self.xilist = [self.leftEdge] * self.M
+        self.psilist = [self.rightEdge] * self.M
+        # The two hard limits below exist only to test whether the hard limits changed or not
+        self.initialxilist = [self.leftEdge] * self.M
+        self.initialpsilist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
         self.Perimeter = 0
         self.Area = 0
+        self.leftEdgeFract = None
+        self.rightEdgeFract = None
         beam.numBeams += 1
 
 ## Class that contains the voxel information
@@ -461,10 +467,8 @@ def getDmatrixPiecesMemorySaving():
     #Beamlets per beam
     bpb = beam.N * beam.M
     uniquev = set()
-    xilist = []
-    psilist = []
-    xilowest = [beam.N // 2] * beam.M
-    psihighest = [beam.N // 2 + 1] * beam.M
+    xilowest = [beamList[0].leftEdge] * beam.M
+    psihighest = [beamList[0].rightEdge] * beam.M
     for fl in [datalocation + 'twolists'+ str(2*x) + '.pickle' for x in thiscase]:
         newvcps = []
         newbcps = []
@@ -488,7 +492,7 @@ def getDmatrixPiecesMemorySaving():
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
         # Wilmer Changed this part here
         #-------------------------------------
-        threshold = 0.4
+        threshold = 0.4 # above this threshold and the beamlet will be considered for insertion into the problem
         bcps = []
         vcps = []
         dcps = []
@@ -509,15 +513,18 @@ def getDmatrixPiecesMemorySaving():
         for i in range(beam.M):
             myones = [i for i, x in enumerate(beamshape[i,]) if x == 1]
             if 0 == len(myones):
-                xi[i], psi[i] = beam.N // 2, beam.N // 2 + 1
+                xi[i], psi[i] = beamList[thisbeam].leftEdge, beamList[thisbeam].rightEdge
             else:
-                xi[i], psi[i] = myones[0] - 1, myones[-1] + 1
+                xi[i], psi[i] = myones[0] - 1, myones[-1] + 1 # this is where I assign the hard boundaries.
+                # one to the left and one to the right of the beamlets that actually produce the dose.
             if xi[i] < xilowest[i]:
                 xilowest[i] = xi[i]
             if psi[i] > psihighest[i]:
                 psihighest[i] = psi[i]
-        xilist.append(xi)
-        psilist.append(psi)
+        beamList[thisbeam].xilist = xi
+        beamList[thisbeam].psilist = psi
+        beamList[thisbeam].initialxilist = xi
+        beamList[thisbeam].initialpsilist = psi
         del newdcps
         del newbcps
         del newvcps
@@ -575,7 +582,7 @@ def getDmatrixPiecesMemorySaving():
         del newbcps
         del newvcps
         gc.collect()
-    return(beamDs, uniquev, xilist, psilist)
+    return(beamDs, uniquev)
 
 #------------------------------------------------------------------------------------------------------------------
 ## This class keeps the core of the function parameters. Regularly calculates doses, and the values of obj. fn. and gradients
@@ -650,7 +657,7 @@ class problemData(object):
 # Output:   validbeamlets ONLY contains those beamlet INDICES for which we have available data in this beam angle
 #           validbeamletspecialrange is the same as validbeamlets but appending the endpoints
 def fvalidbeamlets(index):
-    validbeamlets = np.array(range(beamList[index].leftEdge + 1, beamList[index].rightEdge )) # Wilmer changed this line
+    validbeamlets = np.array(range(beamList[index].N )) # Wilmer changed this line
     validbeamletspecialrange = np.append(np.append(min(validbeamlets) - 1, validbeamlets), max(validbeamlets) + 1)
     # That last line appends the endpoints.
     return (validbeamlets, validbeamletspecialrange)
@@ -670,7 +677,7 @@ def fvalidbeamlets(index):
 # M = Number of rows in an aperture
 # thisApertureIndex = index location in the set of apertures that I have saved.
 # K = Number of times that I will artificially split each interval
-def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K, xilist, psilist):
+def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K):
     print('this aperture index:', thisApertureIndex)
     # Get the slice of the matrix that I need
     if memorySaving:
@@ -680,28 +687,38 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     M = beamList[thisApertureIndex].M
     leftEdge = beamList[thisApertureIndex].leftEdge
     rightEdge = beamList[thisApertureIndex].rightEdge
+    #beamList[thisApertureIndex].leftEdgeFract = leftEdge + (K - 1) / K
+    #beamList[thisApertureIndex].rightEdgeFract = rightEdge - (K - 1) / K
     b = bw
     # vmaxm and vmaxp describe the speeds that are possible for the leaves from the predecessor and to the successor
     vmaxm = vmax
     vmaxp = vmax
-    # Arranging the predecessors and the succesors.
+    # Arranging the predecessors and the succesors
     #Predecessor left and right indices
     if type(predec) is list:
+        hardlcm = [leftEdge] * M
+        hardrcm = [rightEdge] * M
         lcm = [leftEdge] * M
         rcm = [rightEdge] * M
         # If there is no predecessor is as if the pred. speed was infinite
         vmaxm = np.inf
     else:
+        hardlcm = beamList[predec].xilist
+        hardrcm = beamList[predec].psilist
         lcm = beamList[predec].llist
         rcm = beamList[predec].rlist
 
     #Succesors left and right indices
     if type(succ) is list:
+        hardlcp = [leftEdge] * M
+        hardrcp = [rightEdge] * M
         lcp = [leftEdge] * M
         rcp = [rightEdge] * M
         # If there is no successor is as if the succ. speed was infinite.
         vmaxp = np.inf
     else:
+        hardlcp = beamList[succ].xilist
+        hardrcp = beamList[succ].psilist
         lcp = beamList[succ].llist
         rcp = beamList[succ].rlist
 
@@ -712,7 +729,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     posBeginningOfRow = 1
     thisnode = 0
     # Max beamlets per row
-    bpr = K * (rightEdge - leftEdge + 2) # the ones inside plus two edges
+    bpr = K * (beamList[thisApertureIndex].N + 2) # the ones inside plus two edges
     networkNodesNumber = bpr * bpr + M * bpr * bpr + bpr * bpr # An overestimate of the network nodes in this network
     # Initialization of network vectors. This used to be a list before
     lnetwork = np.zeros(networkNodesNumber, dtype = np.float32) #left limit vector
@@ -729,17 +746,17 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
 
     # Predecessor left and right hard limits
     for i in range(M):
-        xilist[thisApertureIndex][i] = min([xilist[thisApertureIndex][i], roundfloor(xilist[predec][i] + vmaxm * (angdistancem/speedlim)/bw), roundfloor(xilist[succ][i] + vmaxm * (angdistancem/speedlim)/bw)])
-        psilist[thisApertureIndex][i] = max([psilist[thisApertureIndex][i], roundceil(psilist[predec][i] + vmaxm * (angdistancem/speedlim)/bw), roundceil(psilist[succ][i] + vmaxm * (angdistancem/speedlim)/bw)])
+        beamList[thisApertureIndex].xilist[i] = roundfloor(min([beamList[thisApertureIndex].xilist[i], hardlcm[i] + vmaxm * (angdistancem/speedlim)/bw, hardlcp[i] + vmaxm * (angdistancem/speedlim)/bw]) )
+        beamList[thisApertureIndex].psilist[i] = roundceil(max([beamList[thisApertureIndex].psilist[i], hardrcm[i] - vmaxm * (angdistancem/speedlim)/bw, hardrcp[i] - vmaxm * (angdistancem/speedlim)/bw]) )
 
     # Work on the first row perimeter and area values
-    leftrange = np.arange(roundceil(max(beam.leftEdgeFract, lcm[0] - vmaxm * (angdistancem/speedlim)/bw, lcp[0] - vmaxp * (angdistancep/speedlim)/bw, xilist[thisApertureIndex][0])), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[0] + vmaxm * (angdistancem/speedlim)/bw , lcp[0] + vmaxp * (angdistancep/speedlim)/bw, psilist[thisApertureIndex][0] )), 1/K)
+    leftrange = np.arange(roundceil(max(lcm[0] - vmaxm * (angdistancem/speedlim)/bw, lcp[0] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[0] + (K-1)/K)), (1/K) + roundfloor(min(lcm[0] + vmaxm * (angdistancem/speedlim)/bw , lcp[0] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[0] - (K-1) / K - 1/K )), 1/K)
     # Check if unfeasible. If it is then assign one value
     if (0 == len(leftrange)):
         midpoint = (angdistancep * lcm[0] + angdistancem * lcp[0])/(angdistancep + angdistancem)
         leftrange = np.arange(midpoint, midpoint + 1)
     for l in leftrange:
-        rightrange = np.arange(roundceil(max(l + (1/K), rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract, rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw, psilist[thisApertureIndex][0] )), 1/K)
+        rightrange = np.arange(roundceil(max(l + (1 / K), rcm[0] - vmaxm * (angdistancem/speedlim)/bw , rcp[0] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[0] + (K-1)/K)), (1/K) + roundfloor(min(rcm[0] + vmaxm * (angdistancem/speedlim)/bw , rcp[0] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[0] - (K-1) / K )), 1/K)
         if (0 == len(rightrange)):
             midpoint = (angdistancep * rcm[0] + angdistancem * rcp[0])/(angdistancep + angdistancem)
             rightrange = np.arange(midpoint, midpoint + 1)
@@ -773,13 +790,18 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         oldflag = nodesinpreviouslevel
         nodesinpreviouslevel = 0
         # And now process normally checking against valid beamlets
-        leftrange = np.arange(roundceil(max(beam.leftEdgeFract, lcm[m] - vmaxm * (angdistancem/speedlim)/bw , lcp[m] - vmaxp * (angdistancep/speedlim)/bw, xilist[thisApertureIndex][m] )), (1/K) + roundfloor(min(beam.rightEdgeFract - (1/K), lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw, psilist[thisApertureIndex][m] )), 1/K)
+        leftrange = np.arange(roundceil(max(lcm[m] - vmaxm * (angdistancem/speedlim)/bw, lcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K - 1/K)), 1/K)
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
+        print('N', beam.N, 'xilist', beamList[thisApertureIndex].xilist[m], 'psilist', beamList[thisApertureIndex].psilist[m])
+        print('leftrange', leftrange)
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
-            rightrange = np.arange(roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw )), (1/K) + roundfloor(min(beam.rightEdgeFract, rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, psilist[thisApertureIndex][m] )), 1 / K)
+            rightrange = np.arange(roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K)), 1 / K)
+            print('left and right range', l, rightrange)
+            print('components', roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K)))
+            print('components left', l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
                 rightrange = np.arange(midpoint, midpoint + 1)
@@ -838,7 +860,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     l.pop(); r.pop()
     return(p, l, r)
 
-def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K, xilist, psilist):
+def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K):
     thisApertureIndex = i
     # print("analysing available aperture" , thisApertureIndex)
     # Find the successor and predecessor of this particular element
@@ -866,13 +888,13 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K, xilist, p
         predec = max(predecs)
         angdistancem = data.notinC(thisApertureIndex) - data.caligraphicC(predec)
     # Find Numeric value of previous and next angle.
-    p, l, r = PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K, xilist, psilist)
+    p, l, r = PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K)
     return(p,l,r,thisApertureIndex)
 
 ## The main difference between this pricing problem and the complete one is that this one analyses one aperture control
 ## point only.
-def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K, xilist, psilist):
-    pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K, xilist, psilist)
+def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K):
+    pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K)
     # Calculate Kelly's aperture measure
     Area = 0.0
     Perimeter = (r[0] - l[0])/beamlet.XSize + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
@@ -905,20 +927,23 @@ def chooseSmallest(locallocation, listinorder, degreesapart):
                 lllist.append(locallocation[i])
     return(lllist)
 
-def PricingProblem(C, C2, C3, vmax, speedlim, bw, K, xilist, psilist):
+def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
     print("Choosing one aperture amongst the ones that are available")
     # Allocate empty list with enough size for all l, r combinations
     global structureList
-
-    partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw, K = K, xilist=xilist, psilist=psilist)
-    if __name__ == '__main__':
-        pool = Pool(processes = numcores)              # process per MP
-        locstotest = data.notinC.loc
-        if debugmode:
-            locstotest = data.notinC.loc[0:numcores]
-        respool = pool.map(partialparsubpp, locstotest)
-    pool.close()
-    pool.join()
+    try:
+        partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw, K = K)
+        if __name__ == '__main__':
+            pool = Pool(processes = numcores)              # process per MP
+            locstotest = data.notinC.loc
+            if debugmode:
+                locstotest = data.notinC.loc[0:numcores]
+            respool = pool.map(partialparsubpp, locstotest)
+        pool.close()
+        pool.join()
+    except:
+        traceback.print_exc()
+        raise
 
     # Get only the pvalues
     pvalues = np.array([result[0] for result in respool])
@@ -982,28 +1007,29 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K, xilist, psilist):
 # output: openaperturenp. the set of available AND open beamlets for the selected aperture. Doesn't contain fractional values
 #         diagmaker. A vector that has a 1 in each position where an openaperturebeamlet is available.
 # openaperturenp is read as openapertureMaps. A member of the VMAT_CLASS.
-def updateOpenAperture(i):
+def updateOpenAperture(i, K):
     leftlimits = 0
     openaperture = []
     ## While openaperturenp contains positions, openapertureStrength contains proportion of the beamlets that's open.
     openapertureStrength = []
     diagmaker = np.zeros(beam.N * beam.M, dtype = float)
-    for m in range(0, len(beamList[i].llist)):
+    for m in range(beam.M):
         # Find geographical values of llist and rlist.
         # Find geographical location of the first row.
         validbeamlets, validbeamletspecialrange = fvalidbeamlets(i)
-        # First index in this row (only full beamlets included in this part
+        # First index in this row
+        beginningOfLeftAperture = beamList[i].llist[m] + 1/K
 
         ## Notice that indleft and indright below may be floats instead of just integers
-        if (beamList[i].llist[m] >= min(validbeamlets) - 1):
+        if (beginningOfLeftAperture >= min(validbeamlets) - 1/K):
             ## I subtract min validbeamlets bec. I want to find coordinates in available space
             ## indleft is where the edge of the left leaf ends. From there on to the right, there are photons.
-            indleft = beamList[i].llist[m] + leftlimits - min(validbeamlets)
+            indleft = beginningOfLeftAperture + leftlimits - min(validbeamlets)
         else:
             # if the left limit is too far away to the left, just take what's available
             indleft = 0
 
-        if (beamList[i].rlist[m] > max(validbeamlets)):
+        if (beamList[i].rlist[m] > max(validbeamlets) + 1/K):
             # If the right limit is too far to the left, just grab the whole thing.
             indright = len(validbeamlets) + leftlimits
         else:
@@ -1073,13 +1099,12 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
         data.caligraphicC.removeIndex(refaper)
         itwasinCaligraphicC = True
         # I NEED to recalculate this in order to update the vector variable beamGrad to be used in the PP Problem
-        data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper)
+        data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper, K)
     # Do as if the dose was zero coming from that aperture
     data.calcDose()
     data.calcGradientandObjValue()
     # Select a new aperture for that particular location
-    pstar, lm, rm, bestApertureIndex, kmeasure, perimeter, area, listApertures = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim,
-                                                                              beamletwidth, K, xilist, psilist)
+    pstar, lm, rm, bestApertureIndex, kmeasure, perimeter, area = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth, K)
     # Put the aperture back in
     if itwasinCaligraphicC:
         data.caligraphicC.insertAngle(bestApertureIndex, data.notinC(bestApertureIndex))
@@ -1094,19 +1119,25 @@ def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
         print('p star < 0')
         # Solve the instance of the RMP associated with caligraphicC. But make sure to put everything back to the values
         # where it was before
+        print('1')
         lmsave = beamList[bestApertureIndex].llist
         rmsave = beamList[bestApertureIndex].rlist
         beamList[bestApertureIndex].llist = lm
         beamList[bestApertureIndex].rlist = rm
+        print('2')
         # Precalculate the aperture map to save times.
-        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex, K)
+        print('3')
         data.rmpres = solveRMC(data.YU, 5)
+        print('4')
         beamList[bestApertureIndex].llist = lmsave
         beamList[bestApertureIndex].rlist = rmsave
-        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
-    return(data.rmpres.fun - oldobj, listApertures)
+        print('5')
+        data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex, K)
+        print('6')
+    return(data.rmpres.fun - oldobj)
 
-def column_generation(C, K, mytime, xilist, psilist):
+def column_generation(C, K, mytime):
     C2 = 1/3
     C3 = 1/4
     CSave = C
@@ -1124,8 +1155,8 @@ def column_generation(C, K, mytime, xilist, psilist):
     ## Maximum intensity
     data.YU = data.RU / data.speedlim
     beamletwidth = beamlet.XSize / 10.0
-    beam.leftEdgeFract = beam.leftEdge + (K - 1) / K
-    beam.rightEdgeFract = beam.rightEdge - (K - 1) / K
+    #beam.leftEdgeFract = beam.leftEdge + (K - 1) / K
+    #beam.rightEdgeFract = beam.rightEdge - (K - 1) / K
     bigListofApertures = []
 
     #Step 0 on Fei's paper. Set C = empty and zbar = 0. The gradient of numbeams dimensions generated here will not
@@ -1144,7 +1175,7 @@ def column_generation(C, K, mytime, xilist, psilist):
         # Step 1 on Fei's paper. Use the information on the current treatment plan to formulate and solve an instance of the PP
         data.calcDose()
         data.calcGradientandObjValue()
-        pstarlist, lmlist, rmlist, bestApertureIndexlist, kmeasurelist, goodaperturesreceived, PerimeterList, AreaList, listAper = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth, K, xilist, psilist)
+        pstarlist, lmlist, rmlist, bestApertureIndexlist, kmeasurelist, goodaperturesreceived, PerimeterList, AreaList, listAper = PricingProblem(C, C2, C3, vmax, data.speedlim, beamletwidth, K)
         bigListofApertures.append(listAper)
         # Step 2. If the optimal value of the PP is nonnegative**, go to step 5. Otherwise, denote the optimal solution to the
         # PP by c and Ac and replace caligraphic C and A = Abar, k \in caligraphicC
@@ -1172,7 +1203,7 @@ def column_generation(C, K, mytime, xilist, psilist):
                 beamList[bestApertureIndex].Area = Area
                 allbeamshapes.append((lm, rm, kmeasure, Perimeter, Area))
                 # Precalculate the aperture map to save times.
-                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex, K)
             data.rmpres = solveRMC(data.YU, 10)
             print('Solved Restricted Master Problem')
             ## List of apertures that was removed in this iteration
@@ -1222,9 +1253,12 @@ def column_generation(C, K, mytime, xilist, psilist):
             contributionsPengList = []
             oldObjectiveValue = data.rmpres.fun  #Base to compare against
             for mynumbeam in rangenumbeams:
-                contribs, listAper = contributionofBeam(mynumbeam, oldObjectiveValue, C, C2, C3, vmax, beamletwidth, K)
+                #print('gonna call contributionofBeam with:', mynumbeam, 'oo', oldObjectiveValue, 'C', C, 'C2', C2, 'C3', C3, 'vmax', vmax, 'bw', beamletwidth, 'K', K)
+                contribs = contributionofBeam(mynumbeam, oldObjectiveValue, C, C2, C3, vmax, beamletwidth, K)
+                print('here')
                 contributionsPengList.append(contribs)
-                bigListofApertures.append(listAper)
+                print('there')
+                #bigListofApertures.append(listAper)
             # pengList will contain a list of the different apertures in decreasing order of contribution
             print('Contributions PengList. This one is not ordered:', contributionsPengList)
             pengList = [x for _, x in sorted(zip(contributionsPengList, rangenumbeams), key=lambda pair: pair[0], reverse=False)]
@@ -1235,12 +1269,12 @@ def column_generation(C, K, mytime, xilist, psilist):
                 if refaper in data.caligraphicC.loc:
                     data.notinC.insertAngle(beamList[refaper].location, beamList[refaper].angle)
                     data.caligraphicC.removeIndex(refaper)
-                    data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper)
+                    data.openApertureMaps[refaper], data.diagmakers[refaper], data.strengths[refaper] = updateOpenAperture(refaper, K)
                 # Calculate dose and gradients
                 data.calcDose()
                 data.calcGradientandObjValue()
                 # Select a new aperture for that particular location
-                pstar, lm, rm, bestApertureIndex, kmeasure, perimeter, area = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth, K, xilist, psilist)
+                pstar, lm, rm, bestApertureIndex, kmeasure, perimeter, area = refinementPricingProblem(refaper, C, C2, C3, vmax, data.speedlim, beamletwidth, K)
                 # Update caligraphic C. why?
                 if pstar >= 0:
                     phi = phi + 1
@@ -1260,7 +1294,7 @@ def column_generation(C, K, mytime, xilist, psilist):
                 beamList[bestApertureIndex].Perimeter = perimeter
                 beamList[bestApertureIndex].Area = area
                 # Precalculate the aperture map to save times.j
-                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex)
+                data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex, K)
                 data.rmpres = solveRMC(data.YU, 100)
                 printresults(len(data.caligraphicC.loc), dropbox + '/Research/VMAT/casereader/outputGraphics/' + caseis, C)
             print("Let's see round of refinement", refinementLoopCounter)
@@ -1293,7 +1327,7 @@ def column_generation(C, K, mytime, xilist, psilist):
             with open(PIK, "wb") as f:
                 pickle.dump(bigListofApertures, f, pickle.HIGHEST_PROTOCOL)
             f.close()
-            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.01 and refinementLoopCounter > 1: #epsilon
+            if np.abs((oldObjectiveValue - data.rmpres.fun)/oldObjectiveValue) < 0.1 and refinementLoopCounter > 1: #epsilon
                 print('refinement produced less than 0.1 percent improvement in the last iteration')
                 print('caligraphicC:', data.caligraphicC.angle)
                 print('notinC: ', data.notinC.angle)
@@ -1431,7 +1465,7 @@ allbeamshapes = [] #This will be a list of tuples
 print('Assigning problemData', time.time() - start)
 start = time.time()
 if memorySaving:
-    data.DlistT, data.voxelsUsed, xilist, psilist = getDmatrixPiecesMemorySaving()
+    data.DlistT, data.voxelsUsed = getDmatrixPiecesMemorySaving()
 else: #Not memorysaving doesn't work anymore
     vlist, blist, dlist = getDmatrixPieces()
     data.voxelsUsed = np.unique(vlist)
@@ -1465,9 +1499,9 @@ if len(sys.argv) > 1:
     CValue = float(sys.argv[1])
     print('new CValue is:', CValue)
 if debugmode:
-    finalintensities = column_generation(CValue, 1, mytime, xilist, psilist)
+    finalintensities = column_generation(CValue, numsubdivisions, mytime)
 else:
-    finalintensities = column_generation(CValue, 1, mytime, xilist, psilist) # Second argument here determines how many times I will cut each beamlet artificially
+    finalintensities = column_generation(CValue, numsubdivisions, mytime) # Second argument here determines how many times I will cut each beamlet artificially
 averageNW = 0.0
 averageW = 0.0
 for i in range(beam.numBeams):
