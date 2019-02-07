@@ -39,11 +39,20 @@ if "brain360" == caseis:
     undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
     overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
 
+if "brain360" == caseis:
+    structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
+    #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
+    #                                                                  60           54           54         54      40      40      10            40]
+    threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
+    undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
+    overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
+
 numcores = 8
-testcase = [i for i in range(0, 180, 60)]
+testcase = [i for i in range(0, 180, 30)]
 fullcase = [i for i in range(180)]
 debugmode = False
-easyread = False
+easyread = True
+numsubdivisions = 1
 
 gc.enable()
 ## Find out the variables according to the hostname
@@ -51,24 +60,28 @@ datalocation = '~'
 if 'radiation-math' == socket.gethostname():  # LAB
     datalocation = "/mnt/fastdata/Data/brain360/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
+    cutter = 44
 elif 'sharkpool' == socket.gethostname():  # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/brain360/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
-elif ('arc-ts.umich.edu' == socket.gethostname().split('.', 1)[1]):  # FLUX
-    datalocation = "/scratch/engin_flux/wilmer/brain360/by-Beam/"
-    dropbox = "/home/wilmer/Dropbox"
+elif ('DESKTOP-EA1PG8V' == socket.gethostname()):  # FLUX
+    datalocation = "C:/Users/wihen/Data/" + caseis + "/by-Beam/"
+    dropbox = "D:\Dropbox"
+    cutter = 45
 else:
     datalocation = "/home/wilmer/Dropbox/Data/brain360/by-Beam/"  # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
 
-
 ## This class contains a structure (region)
+# It could be a PTV or an organ. It also keeps track of the associated goals such
+# as the function coefficients as they pertain to the objective function
 class structure(object):
     ## Static variable that keeps a tally of the total number of structures
     numStructures = 0
     numTargets = 0
     numOARs = 0
-    def __init__(self, sthing):
+    listTargets = []
+    def __init__(self, sthing, s):
         self.Id = sthing.Id
         self.pointsDistanceCM = sthing.pointsDistanceCM
         self.StartPointIndex = sthing.StartPointIndex
@@ -80,36 +93,36 @@ class structure(object):
         alb = "PTV" in self.Id;
         ala = "GTV" in self.Id;
         alc = "CTV" in self.Id;
-        if (alb | ala | alc):
+        if ( alb | ala  | alc):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
-            self.threshold = 44
-            self.overdoseCoeff = 0.01
-            self.underdoseCoeff = 0.0008
+            structure.listTargets.append(s)
+            # NEVER CHANGE THIS! YOU MIGHT HAVE TROUBLE LATER
+            self.threshold = 0.0
+            self.overdoseCoeff = 0.0
+            self.underdoseCoeff = 0.0
         else:
             structure.numOARs += 1
-            self.threshold = 10
-            self.overdoseCoeff = 0.00001
+            self.threshold = 0.0
+            self.overdoseCoeff = 0.0
             self.underdoseCoeff = 0.0
         structure.numStructures += 1
 
-
+## Contains the beam data
+# It keeps the location, the beamlet members, different measures of the aperture
 class beam(object):
     numBeams = 0
     M = None
     N = None
-    # Initialize left and right leaf limits for all
-    leftEdge = -1
-    rightEdge = None
-    leftEdgeFract = None
-    rightEdgeFract = None
     JawX1 = None
     JawX2 = None
     JawY1 = None
     JawY2 = None
-
     def __init__(self, sthing):
+        # Initialize left and right leaf limits for all
+        self.leftEdge = self.N // 2
+        self.rightEdge = self.N // 2 + 1/numsubdivisions
         # Update the static counter and other variables
         self.location = int(int(sthing.Id)/2)
         self.Id = self.location
@@ -125,11 +138,17 @@ class beam(object):
         self.beamletsInBeam = self.beamletsPerBeam
         self.llist = [self.leftEdge] * self.M # One position more or less after the edges given by XStart, YStart in beamlets
         self.rlist = [self.rightEdge] * self.M
+        self.xilist = [self.leftEdge] * self.M
+        self.psilist = [self.rightEdge] * self.M
+        # The two hard limits below exist only to test whether the hard limits changed or not
+        self.initialxilist = [self.leftEdge] * self.M
+        self.initialpsilist = [self.rightEdge] * self.M
         self.KellyMeasure = 0
         self.Perimeter = 0
         self.Area = 0
+        self.leftEdgeFract = None
+        self.rightEdgeFract = None
         beam.numBeams += 1
-
 
 class voxel(object):
     numVoxels = 0
@@ -250,7 +269,7 @@ structureDict = {}
 print("Reading in structures")
 for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
-    structureList.append(structure(dpdata.Structures[s]))
+    structureList.append(structure(dpdata.Structures[s], s))
     structureDict[structureList[s].Id] = s
     print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ',
           structureList[s].EndPointIndex)
@@ -311,6 +330,167 @@ gc.collect()
 ## Get the point to dose data in a sparse matrix
 start = time.time()
 
+# ----------------------------------------------------------------------------------------
+def getDmatrixPiecesCutLimits():
+    threshold = 0.4 # above this threshold and the beamlet will be considered for insertion into the problem
+    if easyread:
+        print('doing an easyread')
+        if debugmode:
+            PIK = 'testdump' + str(threshold) + '.dat'
+        else:
+            PIK = 'fullcasedump' + str(threshold) + '.dat'
+        with open(PIK, "rb") as f:
+            datasave = pickle.load(f)
+        f.close()
+
+        blist = datasave[0]
+        vlist = datasave[1]
+        dlist = datasave[2]
+    else:
+        ## Initialize vectors for voxel component, beamlet component and dose
+        thiscase = fullcase
+        if debugmode:
+            thiscase = testcase
+
+        # Get the ranges of the voxels that I am going to use and eliminate the rest
+        myranges = []
+        for i in structureListRestricted:
+            myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+        ## Read the beams now.
+        counter = 0 # will count the control points
+        beamDs = [None] * beamlet.numBeamlets
+        #Beamlets per beam
+        bpb = beam.N * beam.M
+        uniquev = set()
+        dlist = []
+        vlist = []
+        blist = []
+        # xilowest and psihighest contains minimum and maximum values for each leaf along the path
+        xilowest = [beamList[0].leftEdge] * beam.M
+        psihighest = [beamList[0].rightEdge] * beam.M
+        for fl in [datalocation + 'twolists'+ str(2*x) + '.pickle' for x in thiscase]:
+            newvcps = []
+            newbcps = []
+            newdcps = []
+            counter += 1
+            print('reading datafile Boundary Creation:', counter, ' out of ', len(thiscase), fl)
+            input = open(fl, 'rb')
+            indices, doses = pickle.load(input)
+            input.close()
+            for k in indices.keys(): # k here represents the voxel that we are analyzing
+                for m in myranges:
+                    if k in m:
+                        newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
+                        newbcps += indices[k]
+                        newdcps += doses[k]
+            # Create the matrix that goes in the list
+            print(cutter, fl[cutter:])
+            thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
+            initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
+            # Transform the space of beamlets to the new coordinate system starting from zero
+            newbcps = [i - initialBeamletThisBeam for i in newbcps]
+            # Wilmer Changed this part here
+            #-------------------------------------
+            bcps = []
+            beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
+            for i, v in enumerate(newvcps):
+                if np.log2(data.maskValue[v]) in structure.listTargets:
+                    if newdcps[i] > threshold:
+                        bcps.append(newbcps[i])
+            for i in np.unique(bcps):
+                j = i % beam.N
+                k = i // beam.N
+                beamshape[k, j] = 1
+
+            xi = np.empty(beam.M)
+            psi = np.empty(beam.M)
+            for i in range(beam.M):
+                myones = [i for i, x in enumerate(beamshape[i,]) if x == 1]
+                if 0 == len(myones):
+                    xi[i], psi[i] = beamList[thisbeam].leftEdge, beamList[thisbeam].rightEdge
+                else:
+                    xi[i], psi[i] = myones[0] - 1, myones[-1] + 1 # this is where I assign the hard boundaries.
+                    # one to the left and one to the right of the beamlets that actually produce the dose.
+                if xi[i] < xilowest[i]:
+                    xilowest[i] = xi[i]
+                if psi[i] > psihighest[i]:
+                    psihighest[i] = psi[i]
+            beamList[thisbeam].xilist = xi
+            beamList[thisbeam].psilist = psi
+            beamList[thisbeam].initialxilist = xi
+            beamList[thisbeam].initialpsilist = psi
+            del newdcps
+            del newbcps
+            del newvcps
+            del bcps
+        # Identify positions to eliminate
+        position = int(0)
+        eliminateThesePositions = []
+        for i in range(beam.M):
+            for j in range(beam.N):
+                if j <= xilowest[i] or j >= psihighest[i]:
+                    eliminateThesePositions.append(position)
+                position += 1
+            ## Do the real creation of matrices now
+        keepThesePositions = [i for i in range(bpb) if i not in eliminateThesePositions]
+        counter = 0
+        for fl in [datalocation + 'twolists' + str(2 * x) + '.pickle' for x in thiscase]:
+            newvcps = []
+            newbcps = []
+            newdcps = []
+            counter += 1
+            print('reading datafile:', counter, ' out of ', len(thiscase), fl)
+            input = open(fl, 'rb')
+            indices, doses = pickle.load(input)
+            input.close()
+            for k in indices.keys():  # k here represents the voxel that we are analyzing
+                for m in myranges:
+                    if k in m:
+                        newvcps += [k] * len(indices[k])  # This is the voxel we're dealing with
+                        newbcps += indices[k]
+                        newdcps += doses[k]
+                        uniquev.add(k)
+            # Create the matrix that goes in the list
+            print(cutter, fl[cutter:])
+            thisbeam = int(int(fl[cutter:].split('.')[0]) / 2)  # Find the beamlet in its coordinate space (not in Angle)
+            initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
+            # Transform the space of beamlets to the new coordinate system starting from zero
+            newbcps = [i - initialBeamletThisBeam for i in newbcps]
+            # Remove all positions that for sure will not be used in the pricing problem to save memory
+            mylocs = np.isin(newbcps, keepThesePositions)
+            numgoodguys = sum(mylocs * 1)
+            shortnewbcps = [None] * numgoodguys
+            shortnewdcps = [None] * numgoodguys
+            shortnewvcps = [None] * numgoodguys
+            newgoodguy = 0
+            for i, l in enumerate(mylocs):
+                if l:
+                    shortnewbcps[newgoodguy] = newbcps[i]
+                    shortnewdcps[newgoodguy] = newdcps[i]
+                    shortnewvcps[newgoodguy] = newvcps[i]
+                    newgoodguy += 1
+            # Return bcps to the old coordinate system
+            newbcpsreverted = [i + initialBeamletThisBeam for i in shortnewbcps]
+
+            # print('Adding index beam:', thisbeam, 'Corresponding to angle:', 2 * thisbeam)
+            #beamDs[thisbeam] = sparse.csr_matrix((shortnewdcps, (shortnewvcps, shortnewbcps)), shape=(voxel.numVoxels, bpb),
+            #                                     dtype=float)
+            del newdcps
+            del newbcps
+            del newvcps
+            gc.collect()
+            vlist += shortnewvcps
+            dlist += shortnewdcps
+            blist += newbcpsreverted
+        datasave = [blist, vlist, dlist]
+        if debugmode:
+            PIK = 'testdump' + str(threshold) + '.dat'
+        else:
+            PIK = 'fullcasedump' + str(threshold) + '.dat'
+        with open(PIK, "wb") as f:
+            pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+        f.close()
+    return(vlist, blist, dlist)
 
 # ----------------------------------------------------------------------------------------
 ## Get the point to dose data in a sparse matrix
@@ -330,9 +510,9 @@ def getDmatrixPieces():
         newdcps = datasave[2]
     else:
         ## Initialize vectors for voxel component, beamlet component and dose
-        newvcps = []
-        newbcps = []
-        newdcps = []
+        newvcpsStore = []
+        newbcpsStore = []
+        newdcpsStore = []
 
         thiscase = fullcase
         if debugmode:
@@ -350,6 +530,9 @@ def getDmatrixPieces():
         except OSError:
             pass
         for fl in [datafiles[x] for x in thiscase]:
+            newvcps = []
+            newbcps = []
+            newdcps = []
             print(fl)
             counter += 1
             print('reading datafile:', counter, fl)
@@ -372,6 +555,39 @@ def getDmatrixPieces():
                     with open(dvhdump, "ab") as f:
                         pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
                     f.close()
+            threshold = 0.25 # above this threshold and the beamlet will be considered for insertion into the problem
+            bcps = []
+            vcps = []
+            dcps = []
+            beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
+            for i, v in enumerate(newvcps):
+                if np.log2(data.maskValue[v]) in structure.listTargets:
+                    if newdcps[i] > threshold:
+                        bcps.append(newbcps[i])
+                        vcps.append(newvcps[i])
+                        dcps.append(newdcps[i])
+            for i in np.unique(bcps):
+                j = i % beam.N
+                k = i // beam.N
+                beamshape[k, j] = 1
+
+            xi = np.empty(beam.M)
+            psi = np.empty(beam.M)
+            for i in range(beam.M):
+                myones = [i for i, x in enumerate(beamshape[i,]) if x == 1]
+                if 0 == len(myones):
+                    xi[i], psi[i] = beamList[thisbeam].leftEdge, beamList[thisbeam].rightEdge
+                else:
+                    xi[i], psi[i] = myones[0] - 1, myones[-1] + 1  # this is where I assign the hard boundaries.
+                    # one to the left and one to the right of the beamlets that actually produce the dose.
+                if xi[i] < xilowest[i]:
+                    xilowest[i] = xi[i]
+                if psi[i] > psihighest[i]:
+                    psihighest[i] = psi[i]
+            beamList[thisbeam].xilist = xi
+            beamList[thisbeam].psilist = psi
+            beamList[thisbeam].initialxilist = xi
+            beamList[thisbeam].initialpsilist = psi
             gc.collect()
             del indices
             del doses
@@ -480,14 +696,15 @@ def printresults(myfolder):
     plt.savefig(myfolder + 'DVH-for-debugging-IMRT-BRAIN360.png')
     plt.close()
 
-
-vlist, blist, dlist = getDmatrixPieces()
-print('max of dlist:', max(dlist))
 data = problemData()
+vlist, blist, dlist = getDmatrixPiecesCutLimits()
+print('max of dlist:', max(dlist))
+#data = problemData()
 data.voxelsUsed = np.unique(vlist)
 strsUsd = set([])
 strsIdxUsd = set([])
 for v in data.voxelsUsed:
+    print(v)
     strsUsd.add(voxelList[v].StructureId)
     strsIdxUsd.add(structureDict[voxelList[v].StructureId])
 data.structuresUsed = list(strsUsd)
@@ -540,3 +757,4 @@ DmatBig = sparse.csr_matrix((datasave[2], (datasave[0], datasave[1])), shape=(be
                             dtype=float)
 data.currentDose += DmatBig * data.currentIntensities
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
+print('done!')

@@ -49,7 +49,7 @@ if not ptvpriority:
         #                                                                  60           54           54         54      40      40      10            40]
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
-        overcoeff  =              [         50,         1E+3,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
+        overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
         # limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
@@ -79,7 +79,7 @@ numcores   = 1
 testcase   = [i for i in range(0, 180, 45)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
-debugmode = True
+debugmode = False
 easyread = False
 refinementloops = True #This loop supercedes the eliminationPhase
 eliminationPhase = False # Whether you want to eliminate redundant apertures at the end
@@ -144,7 +144,8 @@ class structure(object):
     numStructures = 0
     numTargets = 0
     numOARs = 0
-    def __init__(self, sthing):
+    listTargets = []
+    def __init__(self, sthing, s):
         self.Id = sthing.Id
         self.pointsDistanceCM = sthing.pointsDistanceCM
         self.StartPointIndex = sthing.StartPointIndex
@@ -160,6 +161,7 @@ class structure(object):
             self.isTarget = True
         if self.isTarget:
             structure.numTargets = structure.numTargets + 1
+            structure.listTargets.append(s)
             # NEVER CHANGE THIS! YOU MIGHT HAVE TROUBLE LATER
             self.threshold = 0.0
             self.overdoseCoeff = 0.0
@@ -331,7 +333,7 @@ structureDict = {}    # keys are the names of the structure and the value is the
 print("Reading in structures")
 for s in range(numstructs):
     print('Reading:', dpdata.Structures[s].Id)
-    structureList.append(structure(dpdata.Structures[s]))
+    structureList.append(structure(dpdata.Structures[s], s))
     structureDict[structureList[s].Id] = s
     print('This structure goes between voxels ', structureList[s].StartPointIndex, ' and ', structureList[s].EndPointIndex)
     
@@ -462,11 +464,12 @@ def getDmatrixPiecesMemorySaving():
     for i in structureListRestricted:
         myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
     ## Read the beams now.
-    counter = 0
+    counter = 0 # will count the control points
     beamDs = [None] * beamlet.numBeamlets
     #Beamlets per beam
     bpb = beam.N * beam.M
     uniquev = set()
+    # xilowest and psihighest contains minimum and maximum values for each leaf along the path
     xilowest = [beamList[0].leftEdge] * beam.M
     psihighest = [beamList[0].rightEdge] * beam.M
     for fl in [datalocation + 'twolists'+ str(2*x) + '.pickle' for x in thiscase]:
@@ -492,13 +495,13 @@ def getDmatrixPiecesMemorySaving():
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
         # Wilmer Changed this part here
         #-------------------------------------
-        threshold = 0.4 # above this threshold and the beamlet will be considered for insertion into the problem
+        threshold = 0.001 # above this threshold and the beamlet will be considered for insertion into the problem
         bcps = []
         vcps = []
         dcps = []
         beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
         for i, v in enumerate(newvcps):
-            if data.maskValue[v] < 3:
+            if np.log2(data.maskValue[v]) in structure.listTargets:
                 if newdcps[i] > threshold:
                     bcps.append(newbcps[i])
                     vcps.append(newvcps[i])
@@ -1141,7 +1144,7 @@ def column_generation(C, K, mytime):
     C2 = 1/3
     C3 = 1/4
     CSave = C
-    C = 0.0
+    #C = 0.0
     #eliminationThreshold = 0.1 Wilmer:This one worked really Well
     eliminationThreshold = 0.3
     ## Maximum leaf speed
@@ -1398,7 +1401,7 @@ def plotApertures(C):
     nrows, ncols = beam.M, beam.N
     print('numbeams', beam.numBeams)
     for mynumbeam in range(0, beam.numBeams):
-        lmag = beamList[mynumbeam].llist
+        lmag = [llim + 1 / numsubdivisions for llim in beamList[mynumbeam].llist]
         rmag = beamList[mynumbeam].rlist
         ## Convert the limits to hundreds.
         for posn in range(0, len(lmag)):
