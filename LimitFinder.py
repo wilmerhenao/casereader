@@ -22,7 +22,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 #caseis = "spine360"
 caseis = "lung360"
-caseis = "brain360"
+#caseis = "brain360"
 #caseis = "braiF360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
@@ -428,7 +428,7 @@ def getDmatrixPiecesMemorySaving():
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
         # Wilmer Changed this part here
         #-------------------------------------
-        threshold = 0.4
+        threshold = 0.55
         bcps = []
         vcps = []
         dcps = []
@@ -461,6 +461,13 @@ def getDmatrixPiecesMemorySaving():
         del newdcps
         del newbcps
         del newvcps
+        # The following part can be deleted. It's just here to see what the aperture looks like
+        viewBeam = np.zeros((beam.M, beam.N), dtype = int)
+        for i in range(beam.M):
+            for j in range(beam.N):
+                if j <= xilowest[i] or j >= psihighest[i]:
+                    viewBeam[i,j] = 1
+        print(viewBeam)
     # Identify positions to eliminate
     position = int(0)
     eliminateThesePositions = []

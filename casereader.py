@@ -1,4 +1,5 @@
 #!/opt/intel/intelpython3/bin/python3.6
+
 import numpy as np
 import dose_to_points_data_pb2
 import sys
@@ -19,10 +20,10 @@ import traceback
 
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
-
+strengthThreshold = 0.45
 #caseis = "spine360"
-#caseis = "lung360"
-caseis = "brain360"
+caseis = "lung360"
+#caseis = "brain360"
 #caseis = "braiF360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
@@ -38,6 +39,7 @@ if "lung360" == caseis:
     threshold  =              [         63,           10,               5,          20,          10,           10 ]
     undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
+    strengthThreshold = 0.4
 
 ptvpriority = False
 
@@ -50,6 +52,8 @@ if not ptvpriority:
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
         overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
+        strengthThreshold = 0.25
+
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
         # limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
@@ -495,14 +499,14 @@ def getDmatrixPiecesMemorySaving():
         newbcps = [i - initialBeamletThisBeam for i in newbcps]
         # Wilmer Changed this part here
         #-------------------------------------
-        threshold = 0.001 # above this threshold and the beamlet will be considered for insertion into the problem
+
         bcps = []
         vcps = []
         dcps = []
         beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
         for i, v in enumerate(newvcps):
             if np.log2(data.maskValue[v]) in structure.listTargets:
-                if newdcps[i] > threshold:
+                if newdcps[i] > strengthThreshold: # above this threshold and the beamlet will be considered for insertion into the problem
                     bcps.append(newbcps[i])
                     vcps.append(newvcps[i])
                     dcps.append(newdcps[i])

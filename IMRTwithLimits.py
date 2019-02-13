@@ -11,17 +11,28 @@ import socket
 import pylab
 import matplotlib.pyplot as plt
 import pickle
+import math
+import sys
 
 # List of organs that will be used
 caseis = "spine360"
-caseis = "lung360"
-caseis = "brain360"
+#caseis = "lung360"
+#caseis = "brain360"
+strengthThreshold = 0.22 # This threshold only works for the spine case. It gets overwritten by all other cases and by
+                        # the input arguments if provided
+
+# let's not read arguments and overwrite the case
+if len(sys.argv) == 3:
+    strengthThreshold = float(sys.argv[2])
+    caseis = sys.argv[1]
+    print('Case Analysed is:', caseis, 'with strength Threshold:', float(sys.argv[2]))
+
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
                          #[      esoph,      trachea,         cordprv,         ptv,        cord ]
 threshold  =              [         10,           10,               5,          39,           5 ]
-undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E-2,         0.0 ]
-overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-2, 3015 * 2E-3 ]
+undercoeff =              [        0.0,          0.0,             0.0, 2891 * 1E2 ,         0.0 ]
+overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-1, 3015 * 2E-3 ]
 
 if "lung360" == caseis:
     structureListRestricted = [          0,            1,               2,           3,           4,            5 ]
@@ -30,14 +41,8 @@ if "lung360" == caseis:
     threshold  =              [         63,           10,               5,          20,          10,           10 ]
     undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
-
-if "brain360" == caseis:
-    structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
-    #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
-    #                                                                  60           54           54         54      40      40      10            40]
-    threshold  =              [         33,           33,            5.0,        5.0,        5.0,         5.0, 5.0,  5.0,   5.0,         5.0]
-    undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
-    overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
+    if 1 == len(sys.argv):
+        strengthThreshold = 0.5 #this is the default threshold value for this case
 
 if "brain360" == caseis:
     structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
@@ -46,12 +51,16 @@ if "brain360" == caseis:
     threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
     undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
     overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
+    if 1 == len(sys.argv):
+        strengthThreshold = 0.45 #this is the default threshold value for this case
+    # above this threshold and the beamlet will be considered for insertion into the problem
 
 numcores = 8
-testcase = [i for i in range(0, 180, 30)]
+testcase = [i for i in range(0, 180, 45)]
 fullcase = [i for i in range(180)]
 debugmode = False
-easyread = True
+easyread = False
+eliminateWrapper = False #True if you want to do the wrap of all hard limits. False, if you want individually.
 numsubdivisions = 1
 
 gc.enable()
@@ -66,8 +75,11 @@ elif 'sharkpool' == socket.gethostname():  # MY HOUSE
     dropbox = "/home/wilmer/Dropbox"
 elif ('DESKTOP-EA1PG8V' == socket.gethostname()):  # FLUX
     datalocation = "C:/Users/wihen/Data/" + caseis + "/by-Beam/"
-    dropbox = "D:\Dropbox"
+    dropbox = "D:/Dropbox"
     cutter = 45
+    numcores = 11
+    if "lung360" == caseis:
+        cutter = 44
 else:
     datalocation = "/home/wilmer/Dropbox/Data/brain360/by-Beam/"  # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
@@ -336,9 +348,9 @@ def getDmatrixPiecesCutLimits():
     if easyread:
         print('doing an easyread')
         if debugmode:
-            PIK = 'testdump' + str(threshold) + '.dat'
+            PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(threshold) + '.dat'
         else:
-            PIK = 'fullcasedump' + str(threshold) + '.dat'
+            PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(threshold) + '.dat'
         with open(PIK, "rb") as f:
             datasave = pickle.load(f)
         f.close()
@@ -358,7 +370,6 @@ def getDmatrixPiecesCutLimits():
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
         ## Read the beams now.
         counter = 0 # will count the control points
-        beamDs = [None] * beamlet.numBeamlets
         #Beamlets per beam
         bpb = beam.N * beam.M
         uniquev = set()
@@ -390,7 +401,7 @@ def getDmatrixPiecesCutLimits():
             # Transform the space of beamlets to the new coordinate system starting from zero
             newbcps = [i - initialBeamletThisBeam for i in newbcps]
             # Wilmer Changed this part here
-            #-------------------------------------
+            #------------------------------
             bcps = []
             beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
             for i, v in enumerate(newvcps):
@@ -423,18 +434,20 @@ def getDmatrixPiecesCutLimits():
             del newbcps
             del newvcps
             del bcps
-        # Identify positions to eliminate
-        position = int(0)
-        eliminateThesePositions = []
-        for i in range(beam.M):
-            for j in range(beam.N):
-                if j <= xilowest[i] or j >= psihighest[i]:
-                    eliminateThesePositions.append(position)
-                position += 1
-            ## Do the real creation of matrices now
-        keepThesePositions = [i for i in range(bpb) if i not in eliminateThesePositions]
+        # Identify positions to eliminate, this is the envolvent case. The individual case is below
+        if eliminateWrapper:
+            position = int(0)
+            eliminateThesePositions = []
+            for i in range(beam.M):
+                for j in range(beam.N):
+                    if j <= xilowest[i] or j >= psihighest[i]:
+                        eliminateThesePositions.append(position)
+                    position += 1
+                ## Do the real creation of matrices now
+            keepThesePositions = [i for i in range(bpb) if i not in eliminateThesePositions]
         counter = 0
         for fl in [datalocation + 'twolists' + str(2 * x) + '.pickle' for x in thiscase]:
+
             newvcps = []
             newbcps = []
             newdcps = []
@@ -453,6 +466,18 @@ def getDmatrixPiecesCutLimits():
             # Create the matrix that goes in the list
             print(cutter, fl[cutter:])
             thisbeam = int(int(fl[cutter:].split('.')[0]) / 2)  # Find the beamlet in its coordinate space (not in Angle)
+
+            if not eliminateWrapper:
+                position = int(0)
+                eliminateThesePositions = []
+                for i in range(beam.M):
+                    for j in range(beam.N):
+                        if j <= beamList[thisbeam].xilist[i] or j >= beamList[thisbeam].psilist[i]:
+                            eliminateThesePositions.append(position)
+                        position += 1
+                    ## Do the real creation of matrices now
+                keepThesePositions = [i for i in range(bpb) if i not in eliminateThesePositions]
+
             initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
             # Transform the space of beamlets to the new coordinate system starting from zero
             newbcps = [i - initialBeamletThisBeam for i in newbcps]
@@ -483,13 +508,14 @@ def getDmatrixPiecesCutLimits():
             dlist += shortnewdcps
             blist += newbcpsreverted
         datasave = [blist, vlist, dlist]
-        if debugmode:
-            PIK = 'testdump' + str(threshold) + '.dat'
-        else:
-            PIK = 'fullcasedump' + str(threshold) + '.dat'
-        with open(PIK, "wb") as f:
-            pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
-        f.close()
+        if not easyread:
+            if debugmode:
+                PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(threshold) + '.dat'
+            else:
+                PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(threshold) + '.dat'
+            with open(PIK, "wb") as f:
+                pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
+            f.close()
     return(vlist, blist, dlist)
 
 # ----------------------------------------------------------------------------------------
@@ -555,14 +581,14 @@ def getDmatrixPieces():
                     with open(dvhdump, "ab") as f:
                         pickle.dump(dvhsave, f, pickle.HIGHEST_PROTOCOL)
                     f.close()
-            threshold = 0.25 # above this threshold and the beamlet will be considered for insertion into the problem
+
             bcps = []
             vcps = []
             dcps = []
             beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
             for i, v in enumerate(newvcps):
                 if np.log2(data.maskValue[v]) in structure.listTargets:
-                    if newdcps[i] > threshold:
+                    if newdcps[i] > strengthThreshold:
                         bcps.append(newbcps[i])
                         vcps.append(newvcps[i])
                         dcps.append(newdcps[i])
@@ -693,13 +719,13 @@ def printresults(myfolder):
     plt.ylabel('Fractional Volume')
     plt.title('IMRT Solution')
     plt.legend(structureNames, prop={'size': 9})
-    plt.savefig(myfolder + 'DVH-for-debugging-IMRT-BRAIN360.png')
+    plt.savefig(myfolder + 'DVH-for-debugging-IMRT-' + caseis + '-Threshold' + str(strengthThreshold) + '.png')
     plt.close()
 
 data = problemData()
 vlist, blist, dlist = getDmatrixPiecesCutLimits()
+
 print('max of dlist:', max(dlist))
-#data = problemData()
 data.voxelsUsed = np.unique(vlist)
 strsUsd = set([])
 strsIdxUsd = set([])
