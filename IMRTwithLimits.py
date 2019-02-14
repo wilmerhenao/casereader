@@ -11,7 +11,6 @@ import socket
 import pylab
 import matplotlib.pyplot as plt
 import pickle
-import math
 import sys
 
 # List of organs that will be used
@@ -344,13 +343,13 @@ start = time.time()
 
 # ----------------------------------------------------------------------------------------
 def getDmatrixPiecesCutLimits():
-    threshold = 0.4 # above this threshold and the beamlet will be considered for insertion into the problem
+    #threshold = 0.4 # above this threshold and the beamlet will be considered for insertion into the problem
     if easyread:
         print('doing an easyread')
         if debugmode:
-            PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(threshold) + '.dat'
+            PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
         else:
-            PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(threshold) + '.dat'
+            PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
         with open(PIK, "rb") as f:
             datasave = pickle.load(f)
         f.close()
@@ -406,7 +405,7 @@ def getDmatrixPiecesCutLimits():
             beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
             for i, v in enumerate(newvcps):
                 if np.log2(data.maskValue[v]) in structure.listTargets:
-                    if newdcps[i] > threshold:
+                    if newdcps[i] > strengthThreshold:
                         bcps.append(newbcps[i])
             for i in np.unique(bcps):
                 j = i % beam.N
@@ -510,9 +509,9 @@ def getDmatrixPiecesCutLimits():
         datasave = [blist, vlist, dlist]
         if not easyread:
             if debugmode:
-                PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(threshold) + '.dat'
+                PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
             else:
-                PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(threshold) + '.dat'
+                PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
             with open(PIK, "wb") as f:
                 pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
             f.close()
@@ -781,6 +780,6 @@ with open("dvhdump.dat", "rb") as f:
 f.close()
 DmatBig = sparse.csr_matrix((datasave[2], (datasave[0], datasave[1])), shape=(beamlet.numBeamlets, voxel.numVoxels),
                             dtype=float)
-data.currentDose += DmatBig * data.currentIntensities
+#data.currentDose += DmatBig * data.currentIntensities
 printresults(dropbox + '/Research/VMAT/casereader/outputGraphics/')
 print('done!')
