@@ -76,7 +76,7 @@ else:
         undercoeff = [300, 5E+4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
 numcores   = 8
-testcase   = [i for i in range(0, 180, 45)]
+testcase   = [i for i in range(30, 180, 45)]
 fullcase   = [i for i in range(180)]
 ## If you activate this option. I will only analyze numcores apertures at a time
 debugmode = True
