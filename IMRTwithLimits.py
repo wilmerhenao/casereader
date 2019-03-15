@@ -18,8 +18,8 @@ import matplotlib.cm as cm
 caseis = "spine360"
 caseis = "lung360"
 #caseis = "brain360"
-strengthThreshold = 0.22 # This threshold only works for the spine case. It gets overwritten by all other cases and by
-                        # the input arguments if provided
+strengthThreshold = 0.05        # This threshold only works for the spine case. It gets overwritten by all other cases and by
+                                # the input arguments if provided
 
 # let's not read arguments and overwrite the case
 if len(sys.argv) == 3:
@@ -42,22 +42,21 @@ if "lung360" == caseis:
     undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
     if 1 == len(sys.argv):
-        strengthThreshold = 0.1 #this is the default threshold value for this case
+        strengthThreshold = 0.05 #this is the default threshold value for this case
 
 if "brain360" == caseis:
     structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
     #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
     #                                                                  60           54           54         54      40      40      10            40]
     threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
-    undercoeff =              [        100,
-                                       5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
+    undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
     overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
     if 1 == len(sys.argv):
-        strengthThreshold = 0.45 #this is the default threshold value for this case
+        strengthThreshold = 0.05 #this is the default threshold value for this case
     # above this threshold and the beamlet will be considered for insertion into the problem
 
 numcores = 8
-testcase = [i for i in range(40, 180, 170)]
+testcase = [i for i in range(40, 180, 130)]
 fullcase = [i for i in range(180)]
 debugmode = True
 easyread = False
@@ -224,6 +223,7 @@ def getDmatrixPiecesCutLimits():
                         newdcps += doses[k]
             # Create the matrix that goes in the list
             print(cutter, fl[cutter:])
+            maxDoseThisAngle = np.max(newdcps)
             thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
             initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
             # Transform the space of beamlets to the new coordinate system starting from zero
@@ -240,7 +240,7 @@ def getDmatrixPiecesCutLimits():
                     beamletMaxVoxels[standardbcps[i]] = v
                 if np.log2(data.maskValue[v]) in [0]: #structure.listTargets:
                     beamletMaxDoses[standardbcps[i]] = max(beamletMaxDoses[standardbcps[i]], newdcps[i])
-                    if newdcps[i] > strengthThreshold:
+                    if newdcps[i] > maxDoseThisAngle * strengthThreshold:
                         bcps.append(newbcps[i])
                         print(newdcps[i])
                         almacenv.append(v)
@@ -370,9 +370,9 @@ def getDmatrixPiecesCutLimits():
         datasave = [blist, vlist, dlist]
         if not easyread:
             if debugmode:
-                PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
+                PIK = 'IMRTEasyReadCases/testdump-' + caseis + 'proportionalThreshold' + str(strengthThreshold) + '.dat'
             else:
-                PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'threshold' + str(strengthThreshold) + '.dat'
+                PIK = 'IMRTEasyReadCases/fullcasedump-' + caseis + 'proportionalThreshold' + str(strengthThreshold) + '.dat'
             with open(PIK, "wb") as f:
                 pickle.dump(datasave, f, pickle.HIGHEST_PROTOCOL)
             f.close()
@@ -389,17 +389,17 @@ vlist, blist, dlist, maxDoses = getDmatrixPiecesCutLimits()
 #plt.title('Maximum doses to target - ' + caseis)
 #plt.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/' + 'histogram-' + caseis + '.png')
 #plt.close()
-
+angleposition = 40
 import pandas as pd
 llim = int(beamletList[0].XStart/10)
-d = {'left': [int(i + 1) for i in beamList[20].xilist], 'right': [int(i) for i in beamList[20].psilist]}
+d = {'left': [int(i + 1) for i in beamList[angleposition].xilist], 'right': [int(i) for i in beamList[angleposition].psilist]}
 df = pd.DataFrame(data=d)
-df.to_csv('outputGraphics/Aperture80' + caseis + '-threshold-' + str(strengthThreshold) +'.csv')
+df.to_csv('outputGraphics/Aperture' + str(angleposition) + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv')
 sys.exit()
-with open('outputGraphics/DansCoordinatesAperture40' + caseis + '-threshold-' + str(strengthThreshold) +'.csv','w') as resultFile:
+with open('outputGraphics/DansCoordinatesAperture40' + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv','w') as resultFile:
     wr = csv.writer(resultFile)
     wr.writerows([int(i + 1 + llim) for i in beamList[20].xilist] + ["|"] + [int(i + llim) for i in beamList[20].psilist])
-with open('outputGraphics/Aperture80' + caseis + '-threshold-' + str(strengthThreshold) +'.csv','w') as resultFile:
+with open('outputGraphics/Aperture40' + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv','w') as resultFile:
     wr = csv.writer(resultFile)
     wr.writerows([str(int(i + 1 + llim)) for i in beamList[20].xilist] + ["|"] + [str(int(i + llim)) for i in beamList[20].psilist])
 sys.exit()

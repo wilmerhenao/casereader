@@ -20,7 +20,7 @@ import traceback
 
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
-strengthThreshold = 0.45
+strengthThreshold = 0.05
 #caseis = "spine360"
 caseis = "lung360"
 #caseis = "brain360"
@@ -39,7 +39,7 @@ if "lung360" == caseis:
     threshold  =              [         63,           10,               5,          20,          10,           10 ]
     undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
-    strengthThreshold = 0.4
+    strengthThreshold = 0.05
 
 ptvpriority = False
 
@@ -52,7 +52,7 @@ if not ptvpriority:
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
         overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
-        strengthThreshold = 0.25
+        strengthThreshold = 0.05
 
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
@@ -122,7 +122,8 @@ else:
     datalocation = "/home/wilmer/Dropbox/Data/spine360/by-Beam/" # MY LAPTOP
     dropbox = "/home/wilmer/Dropbox"
 
-execfile('VMATClasses.py')
+exec(open('VMATClasses.py').read())
+#execfile('VMATClasses.py')
 
 mytime = timedata()
 
@@ -311,9 +312,10 @@ def getDmatrixPiecesMemorySaving():
         vcps = []
         dcps = []
         beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
+        maxDoseThisAngle = np.max(newdcps)
         for i, v in enumerate(newvcps):
             if np.log2(data.maskValue[v]) in structure.listTargets:
-                if newdcps[i] > strengthThreshold: # above this threshold and the beamlet will be considered for insertion into the problem
+                if newdcps[i] > maxDoseThisAngle * strengthThreshold: # above this threshold and the beamlet will be considered for insertion into the problem
                     bcps.append(newbcps[i])
                     vcps.append(newvcps[i])
                     dcps.append(newdcps[i])
