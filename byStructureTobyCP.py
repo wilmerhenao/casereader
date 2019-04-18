@@ -151,7 +151,7 @@ datafolders = [datalocation + "/by-Structure/pVMAT2_Lung_2_90_2/",
 datafolders = [datalocation + "/by-Structure/pVMATDTP1/",
                datalocation + "/by-Structure/pVMATDTP2/",
                datalocation + "/by-Structure/pVMATDTP3/",
-               datalocation + "/by-Structure/pVMATDTP2/"]
+               datalocation + "/by-Structure/pVMATDTP4/"]
 
 for folder in datafolders:
     files = get_files_by_file_size(folder)

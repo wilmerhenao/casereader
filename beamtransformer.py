@@ -47,4 +47,3 @@ for mynum in range(0,359,2):
     d = None
 
 sys.exit()
-

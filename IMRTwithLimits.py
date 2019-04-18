@@ -17,7 +17,7 @@ import matplotlib.cm as cm
 # List of organs that will be used
 caseis = "spine360"
 caseis = "lung360"
-#caseis = "brain360"
+caseis = "brain360"
 strengthThreshold = 0.05        # This threshold only works for the spine case. It gets overwritten by all other cases and by
                                 # the input arguments if provided
 
@@ -56,7 +56,7 @@ if "brain360" == caseis:
     # above this threshold and the beamlet will be considered for insertion into the problem
 
 numcores = 8
-testcase = [i for i in range(40, 180, 130)]
+testcase = [i for i in range(0, 180, 1)]
 fullcase = [i for i in range(180)]
 debugmode = True
 easyread = False
@@ -70,6 +70,7 @@ if 'radiation-math' == socket.gethostname():  # LAB
     datalocation = "/mnt/fastdata/Data/"+ caseis +"/by-Beam/"
     dropbox = "/mnt/datadrive/Dropbox"
     cutter = 44
+    exec(open('VMATClasses.py').read())
 elif 'sharkpool' == socket.gethostname():  # MY HOUSE
     datalocation = "/home/wilmer/Dropbox/Data/"+ caseis + "/by-Beam/"
     dropbox = "/home/wilmer/Dropbox"
@@ -80,12 +81,13 @@ elif ('DESKTOP-EA1PG8V' == socket.gethostname()):  # FLUX
     numcores = 11
     if "lung360" == caseis:
         cutter = 44
+    exec(open('VMATClasses.py').read())
+    #execfile('VMATClasses.py')
 else:
     datalocation = "C:/Users/wilmer/Dropbox/Research/mytempdata/by-Beam/"  # MY LAPTOP
     dropbox = "D:/Dropbox"
     cutter = 60
-
-execfile('VMATClasses.py')
+    execfile('VMATClasses.py')
 
 datafiles = get_files_by_file_size(datalocation)
 
@@ -193,8 +195,11 @@ def getDmatrixPiecesCutLimits():
 
         # Get the ranges of the voxels that I am going to use and eliminate the rest
         myranges = []
+        sickranges = []
         for i in structureListRestricted:
             myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+            if i in structure.listTargets:
+                sickranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
         ## Read the beams now.
         counter = 0 # will count the control points
         #Beamlets per beam
@@ -210,6 +215,7 @@ def getDmatrixPiecesCutLimits():
             newvcps = []
             newbcps = []
             newdcps = []
+            maxsickdose = 0.0
             counter += 1
             print('reading datafile Boundary Creation:', counter, ' out of ', len(thiscase), fl)
             input = open(fl, 'rb')
@@ -221,9 +227,17 @@ def getDmatrixPiecesCutLimits():
                         newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                         newbcps += indices[k]
                         newdcps += doses[k]
+                        for sickrange in sickranges: # Keep track of doses to targets only
+                            if k in sickrange:
+                                maxcandidate = np.max(doses[k])
+                                maxsickdose = max(maxcandidate, maxsickdose)
+
             # Create the matrix that goes in the list
             print(cutter, fl[cutter:])
             maxDoseThisAngle = np.max(newdcps)
+            print('max all doses:', maxDoseThisAngle, maxsickdose)
+            maxDoseThisAngle = maxsickdose
+            print('maxDoseThisAngle:', maxDoseThisAngle)
             thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
             initialBeamletThisBeam = beamList[thisbeam].StartBeamletIndex
             # Transform the space of beamlets to the new coordinate system starting from zero
@@ -235,14 +249,15 @@ def getDmatrixPiecesCutLimits():
             beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
             almacenv = []
             almacenb = []
+            print('my target list:', structure.listTargets)
+            time.sleep(1)
             for i, v in enumerate(newvcps):
                 if beamletMaxDoses[standardbcps[i]] < newdcps[i]: #NOTICE: THIS IS OUTSIDE TARGETS
                     beamletMaxVoxels[standardbcps[i]] = v
-                if np.log2(data.maskValue[v]) in [0]: #structure.listTargets:
+                if np.log2(data.maskValue[v]) in structure.listTargets:
                     beamletMaxDoses[standardbcps[i]] = max(beamletMaxDoses[standardbcps[i]], newdcps[i])
                     if newdcps[i] > maxDoseThisAngle * strengthThreshold:
                         bcps.append(newbcps[i])
-                        print(newdcps[i])
                         almacenv.append(v)
                         almacenb.append(standardbcps[i])
             hottestToTarget = np.reshape(beamletMaxDoses[beamList[thisbeam].StartBeamletIndex : (beamList[thisbeam].EndBeamletIndex + 1)], (beam.M, beam.N))
@@ -250,7 +265,7 @@ def getDmatrixPiecesCutLimits():
             plt.imshow(hottestToTarget, cmap=cm.plasma, origin = 'lower')
             #plt.imshow(hottestToTarget, cmap=cm.plasma)
             plt.title('Heatmap of contributions per beamlet to targets')
-            plt.show()
+            plt.savefig('outputGraphics/brainview' + str(2 * thisbeam) + '.png')
             print(np.unique(almacenv))
             print(np.unique(almacenb))
             xloc = np.reshape(np.zeros(bpb), (beam.M, beam.N))
@@ -272,6 +287,8 @@ def getDmatrixPiecesCutLimits():
                 j = i % beam.N
                 k = i // beam.N
                 beamshape[k, j] = 1
+
+            print(beamshape)
 
             xi = np.empty(beam.M)
             psi = np.empty(beam.M)
@@ -383,18 +400,20 @@ print('total time reading dose to points:', time.time() - start)
 # ------------------------------------------------------------------------------------------------------------------
 
 data = problemData()
+print('done reading problemdata')
 vlist, blist, dlist, maxDoses = getDmatrixPiecesCutLimits()
 
 #plt.hist(maxDoses, bins = 20)
 #plt.title('Maximum doses to target - ' + caseis)
 #plt.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/' + 'histogram-' + caseis + '.png')
 #plt.close()
-angleposition = 40
 import pandas as pd
 llim = int(beamletList[0].XStart/10)
-d = {'left': [int(i + 1) for i in beamList[angleposition].xilist], 'right': [int(i) for i in beamList[angleposition].psilist]}
-df = pd.DataFrame(data=d)
-df.to_csv('outputGraphics/Aperture' + str(angleposition) + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv')
+if debugmode:
+    for angleposition in testcase:
+        d = {'left': [int(i + 1) for i in beamList[angleposition].xilist], 'right': [int(i) for i in beamList[angleposition].psilist]}
+        df = pd.DataFrame(data=d)
+        df.to_csv('outputGraphics/Aperture' + str(2 * angleposition) + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv')
 sys.exit()
 with open('outputGraphics/DansCoordinatesAperture40' + caseis + '-proportionalThreshold-' + str(strengthThreshold) +'.csv','w') as resultFile:
     wr = csv.writer(resultFile)

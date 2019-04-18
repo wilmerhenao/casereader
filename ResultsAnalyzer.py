@@ -201,137 +201,140 @@ def functionAndPenalties (beamList, ds):
         print('looptimes list in hours:', [int(i)/3600 for i in ds[21].looptimes ])
         print('reading time:', int(ds[21].readtime) / 3600)
 
-print('Analysis of aperture shapes')
-ds = pickle.load(open("outputGraphics/pickleApertures-1stPass-C-lung360-0.015-save.dat", "rb"))
-
-print('Analysis of Brain with an emphasis in OAR preservation')
-ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-brain3600.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-print('Value calculated anew:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
-ds = pickle.load(open("outputGraphics/pickle-C-brain360-5.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-brain3605.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-print('Value calculated anew:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
-
-print('Analysis of Brain with an emphasis in PTV destruction')
-ds = pickle.load(open("outputGraphics/pickle-C-brain360-1e-05-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-brain3601e-05.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.001-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-brain3600.001.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-brain360-6-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-brain3606.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-print('Detailed Analysis:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
-
-
-print('Analysis of lung360')
-ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-lung360-1e-05-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-lung3601e-05.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.0001-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.0001.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.001-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.001.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-ds = pickle.load(open("outputGraphics/pickle-C-lung360-1.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-lung3601.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print('Analysis of spine360')
-print(0.0)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.01)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.01-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.01.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.1)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.1-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.1.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.05)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.05-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.05.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.5)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.5-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.5.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.15)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.15-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.15.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.25)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.25-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.25.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(0.75)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.75-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.75.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(1.0)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-1.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3601.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(2.0)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-2.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3602.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(2.5)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-2.5-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3602.5.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(3.5)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-3.5-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine3603.5.pickle", "rb"))
-functionAndPenalties(beamList, ds)
-
-print(10.0)
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-10.0-save.dat", "rb"))
-beamList = pickle.load(open("outputGraphics/beamList-save-spine36010.0.pickle", "rb"))
-functionAndPenalties(beamList, ds)
+# print('Analysis of aperture shapes')
+# ds = pickle.load(open("outputGraphics/pickleApertures-1stPass-C-lung360-0.015-save.dat", "rb"))
+#
+# print('Analysis of Brain with an emphasis in OAR preservation')
+# ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-brain3600.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+# print('Value calculated anew:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
+# ds = pickle.load(open("outputGraphics/pickle-C-brain360-5.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-brain3605.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+# print('Value calculated anew:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
+#
+# print('Analysis of Brain with an emphasis in PTV destruction')
+# ds = pickle.load(open("outputGraphics/pickle-C-brain360-1e-05-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-brain3601e-05.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.001-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-brain3600.001.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-brain360-6-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-brain3606.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+# print('Detailed Analysis:', calcObjValueByStructure(ds[13], ds[18], ds[19], ds[20], ds[12], ds[16]))
+#
+#
+# print('Analysis of lung360')
+# ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-lung360-1e-05-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-lung3601e-05.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.0001-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.0001.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-lung360-0.001-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-lung3600.001.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# ds = pickle.load(open("outputGraphics/pickle-C-lung360-1.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-lung3601.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print('Analysis of spine360')
+# print(0.0)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.01)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.01-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.01.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.1)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.1-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.1.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.05)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.05-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.05.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.5)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.5-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.5.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.15)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.15-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.15.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.25)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.25-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.25.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(0.75)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-0.75-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3600.75.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(1.0)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-1.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3601.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(2.0)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-2.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3602.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(2.5)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-2.5-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3602.5.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(3.5)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-3.5-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine3603.5.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
+#
+# print(10.0)
+# ds = pickle.load(open("outputGraphics/pickle-C-spine360-10.0-save.dat", "rb"))
+# beamList = pickle.load(open("outputGraphics/beamList-save-spine36010.0.pickle", "rb"))
+# functionAndPenalties(beamList, ds)
 
 ## Dan Polan's file:
 import json
-leaf = pickle.load(open("outputGraphics/allbeamshapesbefore-save-brain360-6.pickle", "rb"))
-ds = pickle.load(open("outputGraphics/pickle-C-spine360-10.0-save.dat", "rb"))
-mylist = list()
+leaf = pickle.load(open("outputGraphics/allbeamshapes-save-brain3600.0.pickle", "rb"))
+ds = pickle.load(open("outputGraphics/pickle-C-brain360-0.0-save.dat", "rb"))
+
 angle = 0.0
 meterset = 0.0
+mylist = [None] * 180
+intensities = np.cumsum(ds[14])
+
 for i in range(len(leaf)):
     mybeam = leaf[i]
-    mbeam = [str(i) for i in mybeam[0]]
-    nbeam = [str(i) for i in mybeam[1]]
-    meterset += ds[13][i]
-    mylist.append((str(2 * i), str(meterset), mbeam, nbeam))
-print(mylist)
+    pos = mybeam[5]
+    mbeam = [str(j) for j in mybeam[0]]
+    nbeam = [str(j) for j in mybeam[1]]
+    mylist[pos] = (((2*pos) + 180) % 360, intensities[pos], mbeam, nbeam)
 
-with open('outputGraphics/data.json', 'w') as outfile:
+print(mylist)
+with open('outputGraphics/data2.json', 'w') as outfile:
     json.dump(mylist, outfile)
 
 

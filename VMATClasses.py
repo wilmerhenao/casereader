@@ -4,18 +4,18 @@
 # and the refinement loops
 class timedata(object):
     def __init__(self):
-        self.initialtime = time.time()
-        self.lasttime = time.time()
+        self.initialtime = time.clock()
+        self.lasttime = time.clock()
         self.looptimes = list()
         self.readtime = np.inf
 
     def newloop(self):
-        self.looptimes.append(time.time() - self.lasttime)
-        self.lasttime = time.time()
+        self.looptimes.append(time.clock() - self.lasttime)
+        self.lasttime = time.clock()
 
     def readingtime(self):
-        self.readtime  = time.time() - self.lasttime
-        self.lasttime = time.time()
+        self.readtime  = time.clock() - self.lasttime
+        self.lasttime = time.clock()
 
 ## This class contains a structure (region)
 # It could be a PTV or an organ. It also keeps track of the associated goals such

@@ -1,4 +1,3 @@
-#!/opt/intel/intelpython3/bin/python3.6
 
 import numpy as np
 import dose_to_points_data_pb2
@@ -21,9 +20,10 @@ import traceback
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
 strengthThreshold = 0.05
+Nbeamlets = 1
 #caseis = "spine360"
-caseis = "lung360"
-#caseis = "brain360"
+#caseis = "lung360"
+caseis = "brain360"
 #caseis = "braiF360"
 structureListRestricted = [          4,            8,               1,           7,           0 ]
 #limits                   [         27,           30,              24,       36-47,          22 ]
@@ -37,8 +37,8 @@ if "lung360" == caseis:
     #limits                   [      60-66,      Mean<20,                ,       max45,mean20-max63, mean34-max63 ]
                            #[PTV Composite,    LUNGS-GTV,   CTEX_EXTERNAL,        CORD,       HEART,    ESOPHAGUS ]
     threshold  =              [         63,           10,               5,          20,          10,           10 ]
-    undercoeff =              [        100,          0.0,             0.0,         0.0,         0.0,          0.0]
-    overcoeff  =              [         50,         5E-1,             0.0,      2.2E-2,        1E-8,         5E-7]
+    undercoeff =              [      300000,          0.0,             0.0,         0.0,         0.0,          0.0]
+    overcoeff  =              [       5000,           50,           100.0,         100,         300,          300]
     strengthThreshold = 0.05
 
 ptvpriority = False
@@ -50,9 +50,9 @@ if not ptvpriority:
         #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
         #                                                                  60           54           54         54      40      40      10            40]
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
-        undercoeff =              [        100,         5E+3,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
+        undercoeff =              [        100,         5E+4,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
         overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
-        strengthThreshold = 0.05
+        strengthThreshold = 0.662
 
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
@@ -123,7 +123,6 @@ else:
     dropbox = "/home/wilmer/Dropbox"
 
 exec(open('VMATClasses.py').read())
-#execfile('VMATClasses.py')
 
 mytime = timedata()
 
@@ -264,6 +263,14 @@ def getDmatrixPieces():
 
 #----------------------------------------------------------------------------------------
 
+def fillbeamshape(beamshape, Nbeamlets):
+    newbeamshape = np.reshape(np.zeros(beam.M * beam.N), (beam.M, beam.N))
+    for i in range(beam.M):
+        for j in range(beam.N):
+            newbeamshape[i,j] = 1 * (beamshape[max(0, i - Nbeamlets): min(beam.M, i + Nbeamlets + 1),
+            max(0, j - Nbeamlets): min(beam.N, j + Nbeamlets + 1)].sum() > 0)
+    return(newbeamshape)
+
 ## Get the point to dose data in a list of sparse matrices
 def getDmatrixPiecesMemorySaving():
     ## Initialize vectors for voxel component, beamlet component and dose
@@ -273,8 +280,11 @@ def getDmatrixPiecesMemorySaving():
 
     # Get the ranges of the voxels that I am going to use and eliminate the rest
     myranges = []
+    sickranges = [] # sickranges contains the ranges of the target structures only
     for i in structureListRestricted:
         myranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
+        if i in structure.listTargets:
+            sickranges.append(range(structureList[i].StartPointIndex, structureList[i].EndPointIndex))
     ## Read the beams now.
     counter = 0 # will count the control points
     beamDs = [None] * beamlet.numBeamlets
@@ -288,6 +298,7 @@ def getDmatrixPiecesMemorySaving():
         newvcps = []
         newbcps = []
         newdcps = []
+        maxsickdose = 0.0 #Maxsickdose will contain the maximum dose to any target from any beamlet
         counter += 1
         print('reading datafile Boundary Creation:', counter, ' out of ', len(thiscase), fl)
         input = open(fl, 'rb')
@@ -299,6 +310,10 @@ def getDmatrixPiecesMemorySaving():
                     newvcps += [k] * len(indices[k]) # This is the voxel we're dealing with
                     newbcps += indices[k]
                     newdcps += doses[k]
+                    for sickrange in sickranges:  # Keep track of doses to targets only
+                        if k in sickrange:
+                            maxcandidate = np.max(doses[k])
+                            maxsickdose = max(maxcandidate, maxsickdose)
         # Create the matrix that goes in the list
         print(cutter, fl[cutter:])
         thisbeam = int(int(fl[cutter:].split('.')[0])/2)  #Find the beamlet in its coordinate space (not in Angle)
@@ -312,20 +327,24 @@ def getDmatrixPiecesMemorySaving():
         vcps = []
         dcps = []
         beamshape = np.reshape(np.zeros(bpb), (beam.M, beam.N))
-        maxDoseThisAngle = np.max(newdcps)
+        #maxDoseThisAngle = np.max(newdcps) #Max of all doses (Not used, but here just in case)
+        maxDoseThisAngle = maxsickdose #Max of all doses to targets
         for i, v in enumerate(newvcps):
             if np.log2(data.maskValue[v]) in structure.listTargets:
                 if newdcps[i] > maxDoseThisAngle * strengthThreshold: # above this threshold and the beamlet will be considered for insertion into the problem
                     bcps.append(newbcps[i])
-                    vcps.append(newvcps[i])
-                    dcps.append(newdcps[i])
+                    #vcps.append(newvcps[i]) # No need to use these vectors (waste of time calculating them)
+                    #dcps.append(newdcps[i])
         for i in np.unique(bcps):
             j = i % beam.N
             k = i // beam.N
             beamshape[k, j] = 1
 
+        beamshape = fillbeamshape(beamshape, Nbeamlets)
+
         xi = np.empty(beam.M)
         psi = np.empty(beam.M)
+
         for i in range(beam.M):
             myones = [i for i, x in enumerate(beamshape[i,]) if x == 1]
             if 0 == len(myones):
@@ -333,6 +352,11 @@ def getDmatrixPiecesMemorySaving():
             else:
                 xi[i], psi[i] = myones[0] - 1, myones[-1] + 1 # this is where I assign the hard boundaries.
                 # one to the left and one to the right of the beamlets that actually produce the dose.
+
+        #xi, psi = xipsiexpansion(xi, psi, Nbeamlets)
+        #print(xi, psi)
+        # The for loop below is here to assign the global hull of boundaries
+        for i in range(beam.M):
             if xi[i] < xilowest[i]:
                 xilowest[i] = xi[i]
             if psi[i] > psihighest[i]:
@@ -892,7 +916,7 @@ def calcObjGrad(x, user_data = None):
     return(data.objectiveValue, data.aperturegradient)
 
 def solveRMC(YU, mymaxiter = 20):
-    start = time.time()
+    start = time.clock()
     numbe = data.caligraphicC.len()
     calcObjGrad(data.currentIntensities)
     # Create the boundaries making sure that the only free variables are the ones with perfectly defined apertures.
@@ -903,7 +927,7 @@ def solveRMC(YU, mymaxiter = 20):
         else:
             boundschoice.append((0, 0))
     res = minimize(calcObjGrad, data.currentIntensities, method='L-BFGS-B', jac = True, bounds = boundschoice, tol = 0.1)#, options={'ftol':10e-1, 'disp':5,'maxfun':mymaxiter})
-    print('Restricted Master Problem solved in ' + str(time.time() - start) + ' seconds')
+    print('Restricted Master Problem solved in ' + str(time.clock() - start) + ' seconds')
     return(res)
 
 def contributionofBeam(refaper, oldobj,  C, C2, C3, vmax, beamletwidth, K):
@@ -961,8 +985,8 @@ def column_generation(C, K, mytime):
     #eliminationThreshold = 0.1 Wilmer:This one worked really Well
     eliminationThreshold = 0.3
     ## Maximum leaf speed
-    vmaxincmspersecond = 3.25 # 3.25 cms per second
-    data.speedlim = 0.85  # Values are in the VMATc paper page 2955. 0.85 < s < 6. This is in degrees per second
+    vmaxincmspersecond = 4.25 # 3.25 cms per second
+    data.speedlim = 0.8 # Values are in the VMATc paper page 2955. 0.85 < s < 6. This is in degrees per second
     secondsbetweenbeams = data.distancebetweenbeams / data.speedlim # seconds per beam interval
     cushion = 0.1
     vmax = vmaxincmspersecond * secondsbetweenbeams + cushion
@@ -1017,7 +1041,7 @@ def column_generation(C, K, mytime):
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
                 beamList[bestApertureIndex].Perimeter = Perimeter
                 beamList[bestApertureIndex].Area = Area
-                allbeamshapes.append((lm, rm, kmeasure, Perimeter, Area))
+                allbeamshapes.append((lm, rm, kmeasure, Perimeter, Area, bestApertureIndex))
                 # Precalculate the aperture map to save times.
                 data.openApertureMaps[bestApertureIndex], data.diagmakers[bestApertureIndex], data.strengths[bestApertureIndex] = updateOpenAperture(bestApertureIndex, K)
             data.rmpres = solveRMC(data.YU, 10)
@@ -1105,7 +1129,7 @@ def column_generation(C, K, mytime):
                 # Solve the instance of the RMP associated with caligraphicC and Ak = A_k^bar, k \in
                 beamList[bestApertureIndex].llist = lm
                 beamList[bestApertureIndex].rlist = rm
-                allbeamshapes.append((lm, rm, kmeasure, perimeter, area))
+                allbeamshapes.append((lm, rm, kmeasure, perimeter, area, bestApertureIndex))
                 beamList[bestApertureIndex].KellyMeasure = kmeasure
                 beamList[bestApertureIndex].Perimeter = perimeter
                 beamList[bestApertureIndex].Area = area
@@ -1275,27 +1299,26 @@ def plotAperturesBug(C):
             plt.close()
     pp.close()
 
-start = time.time()
+start = time.clock()
 data = problemData(numbeams)
 allbeamshapes = [] #This will be a list of tuples
-print('Assigning problemData', time.time() - start)
-start = time.time()
+print('Assigning problemData', time.clock() - start)
 if memorySaving:
     data.DlistT, data.voxelsUsed = getDmatrixPiecesMemorySaving()
 else: #Not memorysaving doesn't work anymore
     vlist, blist, dlist = getDmatrixPieces()
     data.voxelsUsed = np.unique(vlist)
-    starttime = time.time()
+    starttime = time.clock()
     DmatBig = sparse.csr_matrix((dlist, (blist, vlist)), shape=(beamlet.numBeamlets, voxel.numVoxels), dtype=float)
     del vlist
     del blist
     del dlist
-    print('Assigned DmatBig in seconds: ', time.time() - starttime)
-    starttime = time.time()
+    print('Assigned DmatBig in seconds: ', time.clock() - starttime)
+    starttime = time.clock()
     data.DlistT = [DmatBig[beamList[i].StartBeamletIndex:(beamList[i].EndBeamletIndex+1),].transpose() for i in range(beam.numBeams)]
-    print('Assigned DmatBig in seconds: ', time.time() - starttime)
-print('total time reading dose to points:', time.time() - start)
-start = time.time()
+    print('Assigned DmatBig in seconds: ', time.clock() - starttime)
+print('total time reading dose to points:', time.clock() - start)
+start = time.clock()
 strsUsd = set([])
 strsIdxUsd = set([])
 for v in data.voxelsUsed:
@@ -1309,7 +1332,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.25
+CValue = 0.0
 mytime.readingtime()
 if len(sys.argv) > 1:
     CValue = float(sys.argv[1])
