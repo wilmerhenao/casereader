@@ -19,18 +19,34 @@ import traceback
 
 # List of organs that will be used# List of organs that will be used
 # The last one is the case to be analysed. They all overwrite
-strengthThreshold = 0.05
+strengthThreshold = 0.97
 Nbeamlets = 1
 #caseis = "spine360"
 #caseis = "lung360"
 caseis = "brain360"
 #caseis = "braiF360"
-structureListRestricted = [          4,            8,               1,           7,           0 ]
-#limits                   [         27,           30,              24,       36-47,          22 ]
-                         #[      esoph,      trachea,         cordprv,         ptv,        cord ]
-threshold  =              [         10,           10,               5,          39,           5 ]
-undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E-2,         0.0 ]
-overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-2, 3015 * 2E-3 ]
+
+CValue = 0.0
+if len(sys.argv) > 1:
+    CValue = float(sys.argv[1])
+    print('new CValue is:', CValue)
+    if len(sys.argv) > 2:
+        caseis = str(sys.argv[2])
+        print('new case is:', caseis)
+
+# structureListRestricted = [          4,            8,               1,           7,           0 ]
+# #limits                   [         27,           30,              24,       36-47,          22 ]
+#                          #[      esoph,      trachea,         cordprv,         ptv,        cord ]
+# threshold  =              [         10,           10,               5,          39,           5 ]
+# undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E-2,         0.0 ]
+# overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-2, 3015 * 2E-3 ]
+
+structureListRestricted = [          4,            8,               1,           7,           0 , 6          ]
+#limits                   [         27,           30,              24,       36-47,          22 , other target???]
+                         #[      esoph,      trachea,         cordprv,         ptv,        cord , ptv]
+threshold  =              [         10,           10,               5,          39,           5 , 39         ]
+undercoeff =              [        0.0,          0.0,             0.0, 2891 * 9E2 ,         0.0 , 2891 * 1E2 ]
+overcoeff  =              [ 624 * 1E-4,  1209 * 1E-4,     6735 * 2E-3, 2891 * 6E-1, 3015 * 2E-3 , 2891 * 6E-1]
 
 if "lung360" == caseis:
     structureListRestricted = [          0,            1,               2,           3,           4,            5 ]
@@ -40,6 +56,7 @@ if "lung360" == caseis:
     undercoeff =              [      300000,          0.0,             0.0,         0.0,         0.0,          0.0]
     overcoeff  =              [       5000,           50,           100.0,         100,         300,          300]
     strengthThreshold = 0.05
+    Nbeamlets = 1
 
 ptvpriority = False
 
@@ -47,12 +64,13 @@ if not ptvpriority:
     # Make sure that the optic nerve is preserved
     if "brain360" == caseis:
         structureListRestricted = [          1,            2,               3,           5,           6,            9,  11,     12,     15,           16]
-        #limits                   [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
+        #  limits                 [        PTV,          PTV,       Brainstem,       ONRVL     ONRVR,      chiasm,    eyeL,   eyeR,  BRAIN,      COCHLEA]
         #                                                                  60           54           54         54      40      40      10            40]
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+4,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
         overcoeff  =              [         50,          150,            5E-5,          5,          5.5,           5, 5E-7,  5E-1,    0.5,         2E-1]
         strengthThreshold = 0.662
+        Nbeamlets = 2
 
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
@@ -61,6 +79,8 @@ if not ptvpriority:
         threshold = [33, 33, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         undercoeff = [100, 5E+3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
+        strengthThreshold = 0.662
+        Nbeamlets = 2
 
 else:
     # Make sure that the PTV dies
@@ -71,6 +91,8 @@ else:
         threshold  =              [         58,           58,            10.0,        10.0,        10.0,         10.0, 30.0,  30.0,   10.0,         10.0]
         undercoeff =              [        100,         5E+4,             0.0,         0.0,         0.0,          0.0,  0.0,   0.0,    0.0,          0.0]
         overcoeff  =              [         50,          150,            5E-5,          50,          55,           50, 5E-7,  5E-1,    5.0,         2E-1]
+        strengthThreshold = 0.662
+        Nbeamlets = 2
 
     if "braiF360" == caseis:
         structureListRestricted = [1, 2, 3, 5, 6, 9, 11, 12, 15, 16]
@@ -79,6 +101,9 @@ else:
         threshold = [33, 33, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
         undercoeff = [300, 5E+4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         overcoeff = [50, 150, 5E-5, 50, 55, 50, 5E-7, 5E-1, 5.0, 2E-1]
+        strengthThreshold = 0.662
+        Nbeamlets = 2
+
 numcores   = 1
 testcase   = [i for i in range(0, 180, 45)]
 fullcase   = [i for i in range(180)]
@@ -632,16 +657,16 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
         # And now process normally checking against valid beamlets
         leftrange = np.arange(roundceil(max(lcm[m] - vmaxm * (angdistancem/speedlim)/bw, lcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(lcm[m] + vmaxm * (angdistancem/speedlim)/bw , lcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K - 1/K)), 1/K)
         # Check if unfeasible. If it is then assign one value but tell the result to the person running this
-        print('N', beam.N, 'xilist', beamList[thisApertureIndex].xilist[m], 'psilist', beamList[thisApertureIndex].psilist[m])
-        print('leftrange', leftrange)
+        #print('N', beam.N, 'xilist', beamList[thisApertureIndex].xilist[m], 'psilist', beamList[thisApertureIndex].psilist[m])
+        #print('leftrange', leftrange)
         if(0 == len(leftrange)):
             midpoint = (angdistancep * lcm[m] + angdistancem * lcp[m])/(angdistancep + angdistancem)
             leftrange = np.arange(midpoint, midpoint + 1)
         for l in leftrange:
             rightrange = np.arange(roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K)), 1 / K)
-            print('left and right range', l, rightrange)
-            print('components', roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K)))
-            print('components left', l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)
+            #print('left and right range', l, rightrange)
+            #print('components', roundceil(max(l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)), (1/K) + roundfloor(min(rcm[m] + vmaxm * (angdistancem/speedlim)/bw , rcp[m] + vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].psilist[m] - (K-1) / K)))
+            #print('components left', l + (1/K), rcm[m] - vmaxm * (angdistancem/speedlim)/bw, rcp[m] - vmaxp * (angdistancep/speedlim)/bw, beamList[thisApertureIndex].xilist[m] + (K-1) / K)
             if (0 == len(rightrange)):
                 midpoint = (angdistancep * rcm[m] + angdistancem * rcp[m])/(angdistancep + angdistancem)
                 rightrange = np.arange(midpoint, midpoint + 1)
@@ -700,7 +725,7 @@ def PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, 
     l.pop(); r.pop()
     return(p, l, r)
 
-def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K):
+def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K, refinementFlag = False):
     thisApertureIndex = i
     # print("analysing available aperture" , thisApertureIndex)
     # Find the successor and predecessor of this particular element
@@ -727,14 +752,19 @@ def parallelizationPricingProblem(i, C, C2, C3, vmax, speedlim, bw, K):
     else:
         predec = max(predecs)
         angdistancem = data.notinC(thisApertureIndex) - data.caligraphicC(predec)
-    # Find Numeric value of previous and next angle.
+    # Find Numeric value of previous and next angle. Measuring the time taken and keeping it in the object
+    thisInitialTime = time.clock()
     p, l, r = PPsubroutine(C, C2, C3, angdistancem, angdistancep, vmax, speedlim, predec, succ, thisApertureIndex, bw, K)
+    #print('about to enter the function from outside')
+    mytime.beamNetworkTime(thisInitialTime, thisApertureIndex, refinementFlag)
+    #print('left the function beamNetworkTime')
+
     return(p,l,r,thisApertureIndex)
 
 ## The main difference between this pricing problem and the complete one is that this one analyses one aperture control
 ## point only.
 def refinementPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K):
-    pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K)
+    pstar, l, r, bestApertureIndex = parallelizationPricingProblem(refaper, C, C2, C3, vmax, speedlim, beamletwidth, K, True)
     # Calculate Kelly's aperture measure
     Area = 0.0
     Perimeter = (r[0] - l[0])/beamlet.XSize + np.sign(r[0] - l[0]) # First part of the perimeter plus first edge
@@ -772,7 +802,7 @@ def PricingProblem(C, C2, C3, vmax, speedlim, bw, K):
     # Allocate empty list with enough size for all l, r combinations
     global structureList
     try:
-        partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw, K = K)
+        partialparsubpp = partial(parallelizationPricingProblem, C=C, C2=C2, C3=C3, vmax=vmax, speedlim=speedlim, bw=bw, K=K, refinementFlag=False)
         if __name__ == '__main__':
             pool = Pool(processes = numcores)              # process per MP
             locstotest = data.notinC.loc
@@ -1261,44 +1291,6 @@ def plotApertures(C):
     fig.savefig(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures' + caseis + str(C) + '.png')
     plt.close()
     
-def plotAperturesBug(C):
-    magnifier = 50
-    ## Plotting apertures
-    xcoor = math.ceil(math.sqrt(beam.numBeams))
-    ycoor = math.ceil(math.sqrt(beam.numBeams))
-    xcoor = 3
-    ycoor = 4
-    nrows, ncols = beam.M, beam.N
-    print('numbeams', beam.numBeams)
-    pp = PdfPages(dropbox + '/Research/VMAT/casereader/outputGraphics/plotofapertures' + caseis + str(C) + '.pdf')
-    for mynumbeam in range(0, beam.numBeams):
-        position = mynumbeam % (xcoor * ycoor)
-        lmag = beamList[mynumbeam].llist
-        rmag = beamList[mynumbeam].rlist
-        ## Convert the limits to hundreds.
-        for posn in range(0, len(lmag)):
-            lmag[posn] = int(magnifier * lmag[posn])
-            rmag[posn] = int(magnifier * rmag[posn])
-        image = -1 * np.ones(magnifier * nrows * ncols)
-            # Reshape things into a 9x9 grid
-        image = image.reshape((nrows, magnifier * ncols))
-        for i in range(0, beam.M):
-            image[i, lmag[i]:(rmag[i]-1)] = data.rmpres.x[mynumbeam] #intensity assignment
-        image = np.repeat(image, 7*magnifier, axis = 0) # Repeat. Otherwise the figure will look flat like a pancake
-        image[0,0] = data.YU # In order to get the right list of colors
-        # Set up a location where to save the figure
-        fig = plt.figure(1)
-        plt.subplot(ycoor,xcoor, position + 1)
-        cmapper = plt.get_cmap("autumn_r")
-        cmapper.set_under('black', 1.0)
-        plt.imshow(image, cmap = cmapper, vmin = 0.0, vmax = data.YU)
-        plt.axis('off')
-        if position == xcoor * ycoor -1:
-            print('had to do it')
-            pp.savefig()
-            plt.close()
-    pp.close()
-
 start = time.clock()
 data = problemData(numbeams)
 allbeamshapes = [] #This will be a list of tuples
@@ -1332,11 +1324,7 @@ for s in data.structureIndexUsed:
     structureNames.append(structureList[s].Id) #Names have to be organized in this order or it doesn't work
 print(structureNames)
 
-CValue = 0.0
 mytime.readingtime()
-if len(sys.argv) > 1:
-    CValue = float(sys.argv[1])
-    print('new CValue is:', CValue)
 if debugmode:
     finalintensities = column_generation(CValue, numsubdivisions, mytime)
 else:
